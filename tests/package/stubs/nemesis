@@ -1,0 +1,6 @@
+#!/bin/sh
+echo "nemesis $*" >> "${PM_STUB_LOG:-/dev/null}"
+case "$1" in
+    root) [ -z "$PM_NEMESIS_FAIL" ] || exit 1 ;;
+esac
+exit 0

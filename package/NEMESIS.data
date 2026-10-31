@@ -1,0 +1,14 @@
+[nemesis]
+id=hkg.package.manager
+name=HKG Package Manager
+version=1.0.0
+types=application
+preinstall=scripts/pre.sh
+postinstall=scripts/post.sh
+preuninstall=scripts/preun.sh
+
+[app.0]
+kind=apk
+path=app/hkgpm.apk
+package=hkgpackagemanager.app
+component=hkgpackagemanager.app/.MainActivity

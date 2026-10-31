@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "am $*" >> "${PM_STUB_LOG:-/dev/null}"
+[ -z "$PM_AM_FAIL" ] || exit 1
+exit 0
