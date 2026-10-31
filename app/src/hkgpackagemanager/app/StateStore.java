@@ -16,6 +16,7 @@ import java.io.InputStream;
 
 /** Settings kept under /data/nemesis (survives app reinstall), with a cache in filesDir for the receiver. */
 public final class StateStore {
+    private static final Object KEYS_LOCK = new Object();
     static final String STATE_DIR = "/data/nemesis/hkg.package.manager";
     static final String SETTINGS_PATH = STATE_DIR + "/settings.txt";
     static final String KEYS_PATH = STATE_DIR + "/keys.txt";
@@ -53,6 +54,24 @@ public final class StateStore {
         String text = loadText(KEYS_PATH, keysCache, "keys");
         if (text == null) text = readCache(keysCache);
         return text == null ? TrustedKeys.NONE : TrustedKeys.decode(text);
+    }
+
+    /** Reads the keys fresh, adds one and saves, all under one lock; returns the new set. */
+    public TrustedKeys addKey(String fp, String label) {
+        synchronized (KEYS_LOCK) {
+            TrustedKeys k = loadKeys().with(fp, label);
+            saveKeys(k);
+            return k;
+        }
+    }
+
+    /** Reads the keys fresh, removes one and saves, all under one lock; returns the new set. */
+    public TrustedKeys removeKey(String fp) {
+        synchronized (KEYS_LOCK) {
+            TrustedKeys k = loadKeys().without(fp);
+            saveKeys(k);
+            return k;
+        }
     }
 
     /** Writes the cache, then root-copies it into the state folder. */

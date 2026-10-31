@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Which car button opens the app, how many presses (for a pressed button), the log copy, and the trusted catalog keys. */
@@ -45,6 +46,7 @@ final class SettingsScreen implements Ui.Screen {
     private final TextView keysResult;
     private Settings settings = Settings.DEFAULT;
     private TrustedKeys keys = TrustedKeys.NONE;
+    private int keysGeneration; // bumped by each local change; a load that started before it is stale
 
     /** A key file that parsed and isn't trusted yet. */
     private static final class Found {
@@ -120,11 +122,12 @@ final class SettingsScreen implements Ui.Screen {
                 show();
             }
         });
+        final int gen = keysGeneration;
         Ui.background(act, new Ui.Work<TrustedKeys>() {
             public TrustedKeys run() { return store.loadKeys(); }
         }, new Ui.Done<TrustedKeys>() {
             public void done(TrustedKeys k) {
-                if (k != null) keys = k;
+                if (k != null && gen == keysGeneration) keys = k;
                 showKeys();
             }
         });
@@ -198,31 +201,30 @@ final class SettingsScreen implements Ui.Screen {
     private void confirmRemove(final String fp, String label) {
         Ui.confirm(act, null, "Stop trusting " + label + "?", "Remove", new Runnable() {
             public void run() {
-                keys = keys.without(fp);
-                showKeys();
-                saveKeys(keys, null);
+                keysResult.setText("");
+                Ui.background(act, new Ui.Work<TrustedKeys>() {
+                    public TrustedKeys run() { return store.removeKey(fp); }
+                }, new Ui.Done<TrustedKeys>() {
+                    public void done(TrustedKeys k) { applyKeys(k); }
+                });
             }
         }, "Cancel", null);
     }
 
-    /** Saves on a background thread, then runs {@code then} (may be null) on the UI thread. */
-    private void saveKeys(final TrustedKeys k, final Runnable then) {
-        Ui.background(act, new Ui.Work<Boolean>() {
-            public Boolean run() {
-                store.saveKeys(k);
-                return Boolean.TRUE;
-            }
-        }, new Ui.Done<Boolean>() {
-            public void done(Boolean ok) { if (then != null) then.run(); }
-        });
+    /** Takes the set a locked read-modify-write returned. */
+    private void applyKeys(TrustedKeys k) {
+        if (k == null) return;
+        keysGeneration++;
+        keys = k;
+        showKeys();
     }
 
     private void addKeys() {
         keysResult.setText("Reading the drive…");
-        final TrustedKeys trusted = keys;
         Ui.background(act, new Ui.Work<Scan>() {
             public Scan run() {
                 Scan scan = new Scan();
+                TrustedKeys trusted = store.loadKeys();
                 String root = ScreenText.chooseStick(Sticks.mounted(), null);
                 if (root == null) {
                     scan.noStick = true;
@@ -233,7 +235,7 @@ final class SettingsScreen implements Ui.Screen {
                 Arrays.sort(files);
                 for (File f : files) {
                     String name = f.getName();
-                    if (!name.toLowerCase().endsWith(".pem") || !f.isFile()) continue;
+                    if (!name.toLowerCase(Locale.ENGLISH).endsWith(".pem") || !f.isFile()) continue;
                     try {
                         CatalogKey key = CatalogKey.fromPem(readCapped(f));
                         if (!trusted.trusts(key.fingerprint)) scan.found.add(new Found(name, key.fingerprint));
@@ -265,7 +267,7 @@ final class SettingsScreen implements Ui.Screen {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[2048];
             int n;
-            while ((n = in.read(buf)) > 0) {
+            while ((n = in.read(buf)) != -1) {
                 out.write(buf, 0, n);
                 if (out.size() > MAX_KEY_BYTES) throw new BadCatalogException("file too large for a key");
             }
@@ -292,10 +294,13 @@ final class SettingsScreen implements Ui.Screen {
         Ui.confirm(act, null, ScreenText.trustConfirm(f.fileName, f.fingerprint), ScreenText.TRUST_BUTTON,
                 new Runnable() {
                     public void run() {
-                        keys = keys.with(f.fingerprint, f.fileName);
-                        showKeys();
-                        saveKeys(keys, new Runnable() {
-                            public void run() { askNext(scan, index + 1, added + 1); }
+                        Ui.background(act, new Ui.Work<TrustedKeys>() {
+                            public TrustedKeys run() { return store.addKey(f.fingerprint, f.fileName); }
+                        }, new Ui.Done<TrustedKeys>() {
+                            public void done(TrustedKeys k) {
+                                applyKeys(k);
+                                askNext(scan, index + 1, k == null ? added : added + 1);
+                            }
                         });
                     }
                 }, "Cancel", skip, skip);

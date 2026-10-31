@@ -291,7 +291,7 @@ final class DriveScreen implements Ui.Screen {
                     public void run() {
                         Ui.background(act, new Ui.Work<Boolean>() {
                             public Boolean run() {
-                                new StateStore(act, cli).saveKeys(keys.with(v.fingerprint, v.index.name));
+                                new StateStore(act, cli).addKey(v.fingerprint, v.index.name);
                                 return Boolean.TRUE;
                             }
                         }, new Ui.Done<Boolean>() {
