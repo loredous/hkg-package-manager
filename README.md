@@ -9,9 +9,19 @@ a car button that opens it (hold Media by default, or press Navigation a set num
 owner's key capture ([docs/notes/key-capture.md](docs/notes/key-capture.md)). The manager can
 also always be opened from NEMESIS Manager > Packages > HKG Package Manager > Launch.
 
+**Phase 2 (version 1.1.0) built, not yet tried on the car.** It adds signed package catalogs
+on the stick (`HKGPM/catalogs/<id>/`), trusted keys, a green/yellow/red compatibility check
+before installing, and `cli/hkgpm_mirror.py` to copy a catalog onto a stick from a desktop.
+Stick-only use with loose zips works as in Phase 1. The on-car test catalogs come from
+`python3 tests/catalog/make_catalog.py car dist/test-catalogs` (test-only keys; the CI
+artifact `hkg-test-catalogs-*` holds them too).
+
 - Design: [docs/superpowers/specs/2026-10-30-hkg-package-manager-design.md](docs/superpowers/specs/2026-10-30-hkg-package-manager-design.md)
 - Plan: [docs/superpowers/plans/2026-10-30-phase-1-package-manager.md](docs/superpowers/plans/2026-10-30-phase-1-package-manager.md)
 - On-car checklist: [docs/testing/2026-10-30-phase-1.md](docs/testing/2026-10-30-phase-1.md)
+- Phase 2 on-car checklist: [docs/testing/2026-10-31-phase-2.md](docs/testing/2026-10-31-phase-2.md)
+- Catalog format: [docs/catalog/format.md](docs/catalog/format.md)
+- Mirror CLI (copies a signed catalog to a stick): [cli/README.md](cli/README.md)
 - Key capture notes: [docs/notes/key-capture.md](docs/notes/key-capture.md)
 
 ## Build
@@ -35,6 +45,10 @@ version you hand out is signed the same way and a plain `pm install -r` stays po
 Full test run:
 
     tools/test-java.sh && sh tests/kit/run.sh && sh tests/resume/run.sh && sh tests/app/check-app.sh && sh tests/package/run.sh
+
+Python tests (stdlib plus `openssl`):
+
+    python3 -m unittest discover -s tests/catalog && python3 -m unittest discover -s tests/cli
 
 Shell lint (head unit shell has no `printf`, `tail`, `head`, `seq`, `awk`, `grep`, `[[ ]]`):
 `tools/lint-sh.sh kit package stick`.

@@ -10,6 +10,9 @@
 #   package/NEMESIS.data and the built APK, and the zips are attached to the GitHub release for
 #   the tag.
 #
+# The on-car test catalogs (tests/catalog/make_catalog.py car) are signed with keys that are public
+# on purpose, so they go to dist/test/ and their own artifact, never to a release.
+#
 # tools/build-test-packages.sh needs ../hmg_nemesis, so the checklist's test packages aren't
 # built here.
 name: build
@@ -65,6 +68,8 @@ jobs:
           tools/test-java.sh
           sh tests/kit/run.sh
           sh tests/resume/run.sh
+          python3 -m unittest discover -s tests/catalog -v
+          python3 -m unittest discover -s tests/cli -v
           tools/lint-sh.sh kit package stick
 
       - name: Release signing key
@@ -94,6 +99,9 @@ jobs:
           tools/build-package.sh
           sh tests/package/run.sh
           tools/build-kit.sh
+          python3 tests/catalog/make_catalog.py car dist/test-catalogs
+          mkdir -p dist/test
+          (cd dist/test-catalogs && zip -qr ../test/hkg-test-catalogs.zip .)
 
       - name: Remove the signing key
         if: always()
@@ -103,6 +111,12 @@ jobs:
         with:
           name: hkg-package-manager-${{ env.RELEASE == 'true' && github.ref_name || format('ci-{0}', github.sha) }}
           path: dist/*.zip
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hkg-test-catalogs-${{ env.RELEASE == 'true' && github.ref_name || format('ci-{0}', github.sha) }}
+          path: dist/test/hkg-test-catalogs.zip
           if-no-files-found: error
 
   release:

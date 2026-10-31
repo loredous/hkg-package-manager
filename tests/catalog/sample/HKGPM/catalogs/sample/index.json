@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "generated": "2026-11-01T00:00:00Z",
+  "id": "sample",
+  "key": "a96cf09a66920f63953867477d0c4291a0918579b47c0b8c4e768a49c38cbf69",
+  "name": "Sample catalog",
+  "packages": [
+    {
+      "author": "hkg-package-manager tests",
+      "compatibility": {
+        "works_on": [
+          {
+            "build": "NEEV23.*"
+          }
+        ]
+      },
+      "description": "Works on matching builds.",
+      "id": "sample.green",
+      "name": "Sample green",
+      "sha256": "5c8d5b9a5d46ba1286d6cdddbfb300804158e81bb09e0c40baf6147c0657ed94",
+      "size": 324,
+      "version": "1.0.0",
+      "zip": "zips/sample.green.zip"
+    },
+    {
+      "author": "hkg-package-manager tests",
+      "compatibility": {
+        "works_on": [
+          {
+            "hardware": [
+              "wifi"
+            ]
+          }
+        ]
+      },
+      "description": "Works on cars with Wi-Fi.",
+      "id": "sample.wifi",
+      "name": "Sample wifi",
+      "sha256": "fe1102e9ff9683d4def955adb8e1c304d0ef94fd185d9ea7e9b53ffa7804b66a",
+      "size": 322,
+      "version": "1.0.0",
+      "zip": "zips/sample.wifi.zip"
+    },
+    {
+      "author": "hkg-package-manager tests",
+      "compatibility": {
+        "not_on": [
+          {
+            "build": "*"
+          }
+        ]
+      },
+      "description": "Known not to work anywhere.",
+      "id": "sample.red",
+      "name": "Sample red",
+      "sha256": "afab38b5f298bdbb122308f8afc3048a0b0ddafd0ed5706efb6eea13ac177435",
+      "size": 320,
+      "version": "1.0.0",
+      "zip": "zips/sample.red.zip"
+    },
+    {
+      "author": "hkg-package-manager tests",
+      "compatibility": {
+        "conflicts": [
+          "sample.green"
+        ]
+      },
+      "description": "Conflicts with sample.green.",
+      "id": "sample.conflict",
+      "name": "Sample conflict",
+      "sha256": "94f0b02c2e7e6dd10c6c82709298e964d63237d41ce713cb61e332c2a2631cae",
+      "size": 330,
+      "version": "1.0.0",
+      "zip": "zips/sample.conflict.zip"
+    },
+    {
+      "author": "hkg-package-manager tests",
+      "description": "No compatibility data.",
+      "id": "sample.plain",
+      "name": "Sample plain",
+      "sha256": "e08680e5d8ea4775567aed23db2e0e5ffafc4981c9dac57d0be438fe168b1463",
+      "size": 324,
+      "version": "1.0.0",
+      "zip": "zips/sample.plain.zip"
+    }
+  ],
+  "publisher": "hkg-package-manager tests"
+}

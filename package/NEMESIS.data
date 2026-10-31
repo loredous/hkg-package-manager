@@ -1,7 +1,7 @@
 [nemesis]
 id=hkg.package.manager
 name=HKG Package Manager
-version=1.0.0
+version=1.1.0
 types=application
 preinstall=scripts/pre.sh
 postinstall=scripts/post.sh

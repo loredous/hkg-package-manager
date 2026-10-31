@@ -43,7 +43,7 @@ public final class StickScanner {
         }
     }
 
-    private static StickZip inspect(File f, String relPath) {
+    public static StickZip inspect(File f, String relPath) {
         long size = f.length();
         ZipFile zip;
         try {

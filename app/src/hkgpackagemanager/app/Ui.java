@@ -8,7 +8,10 @@ import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import java.util.List;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -18,6 +21,9 @@ final class Ui {
     static final int TEXT_SP = 24;
     static final int TARGET_DP = 64;
     static final int GREY = 0xFF888888;
+    static final int GREEN = 0xFF2E9E44;
+    static final int YELLOW = 0xFFC9A100;
+    static final int RED = 0xFFD03030;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     /** One tab's content. */
@@ -146,6 +152,11 @@ final class Ui {
         });
         AlertDialog d = b.create();
         d.show();
+        styleButtons(a, d);
+        return d;
+    }
+
+    private static void styleButtons(Activity a, AlertDialog d) {
         for (int which : new int[] {DialogInterface.BUTTON_POSITIVE, DialogInterface.BUTTON_NEGATIVE}) {
             Button btn = d.getButton(which);
             if (btn != null) {
@@ -153,6 +164,45 @@ final class Ui {
                 btn.setMinHeight(dp(a, TARGET_DP));
             }
         }
+    }
+
+    /** A confirmation whose Install button stays disabled until the one tick is ticked; Back or Cancel do nothing. */
+    static AlertDialog confirmWithTick(Activity a, String message, String tick, String yes, Runnable onYes) {
+        List<String> ticks = new java.util.ArrayList<String>();
+        ticks.add(tick);
+        return confirmWithTicks(a, message, ticks, yes, onYes);
+    }
+
+    /** As {@link #confirmWithTick}, with one tick per label; the positive button needs all of them. */
+    static AlertDialog confirmWithTicks(Activity a, String message, List<String> ticks, String yes,
+            final Runnable onYes) {
+        LinearLayout body = wrap(a, message);
+        final int[] left = {ticks.size()};
+        final AlertDialog[] dialog = new AlertDialog[1];
+        for (String label : ticks) {
+            CheckBox box = new CheckBox(a);
+            box.setText(label);
+            box.setTextSize(TEXT_SP);
+            box.setMinimumHeight(dp(a, TARGET_DP));
+            box.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                public void onCheckedChanged(CompoundButton b, boolean on) {
+                    left[0] += on ? -1 : 1;
+                    dialog[0].getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(left[0] == 0);
+                }
+            });
+            body.addView(box);
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(a);
+        b.setView(scroll(a, body));
+        b.setPositiveButton(yes, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface d, int w) { if (onYes != null) onYes.run(); }
+        });
+        b.setNegativeButton("Cancel", null);
+        AlertDialog d = b.create();
+        dialog[0] = d;
+        d.show();
+        styleButtons(a, d);
+        d.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(left[0] == 0);
         return d;
     }
 

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HKG Package Manager catalog index (format 1)",
+  "description": "The index.json of a catalog. Unknown fields are allowed everywhere and ignored by readers. See format.md.",
+  "type": "object",
+  "required": ["format", "id", "name", "publisher", "generated", "key", "packages"],
+  "properties": {
+    "format": { "type": "integer", "minimum": 1, "description": "Format version. This document describes 1." },
+    "id": { "type": "string", "pattern": "^(?!\\.)(?!.*\\.\\.)[A-Za-z0-9._-]{1,64}$", "description": "Catalog id; the catalog folder is named the same." },
+    "name": { "type": "string", "description": "Catalog name shown to people." },
+    "publisher": { "type": "string", "description": "Who publishes the catalog." },
+    "generated": { "type": "string", "description": "When the index was generated, as an ISO 8601 UTC time." },
+    "key": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Fingerprint of the signing key: lowercase hex SHA-256 of the SPKI DER of key.pem." },
+    "packages": { "type": "array", "items": { "$ref": "#/$defs/entry" }, "description": "One entry per package id." }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "name", "version", "description", "author", "zip", "size", "sha256"],
+      "properties": {
+        "id": { "type": "string", "description": "Package id." },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string", "description": "Short description." },
+        "author": { "type": "string" },
+        "homepage": { "type": "string", "description": "Optional project page." },
+        "zip": { "type": "string", "description": "Relative path under the catalog folder (not starting with remote/), or an http:// or https:// URL." },
+        "size": { "type": "integer", "minimum": 0, "description": "Zip size in bytes." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$", "description": "SHA-256 of the zip, in hex." },
+        "compatibility": { "$ref": "#/$defs/compatibility" }
+      },
+      "additionalProperties": true
+    },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "works_on": { "type": "array", "items": { "$ref": "#/$defs/rule" }, "description": "Positive rules: any match makes the package green." },
+        "not_on": { "type": "array", "items": { "$ref": "#/$defs/rule" }, "description": "Negative rules: any match makes the package red." },
+        "conflicts": { "type": "array", "items": { "type": "string" }, "description": "Package ids that, if installed, count as a negative match." }
+      },
+      "additionalProperties": true
+    },
+    "rule": {
+      "type": "object",
+      "properties": {
+        "build": { "type": "string", "description": "Glob (* and ?) matched against the whole ro.build.product, case-sensitive." },
+        "hardware": { "type": "array", "items": { "type": "string" }, "description": "Names required present (wifi) or absent (!wifi). Only wifi is defined." }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -44,6 +44,9 @@ public final class QueueSession {
             if (f == null) {
                 items.add(new QueueItem(i.relPath, 0, "", i.id, i.version, i.update,
                         ItemState.FAILED, Messages.MSG_MISSING));
+            } else if (ZipVerify.differs(f, i.size, i.sha256)) {
+                items.add(new QueueItem(i.relPath, i.size, i.sha256, i.id, i.version, i.update,
+                        ItemState.FAILED, Messages.MSG_CATALOG_MISMATCH));
             } else {
                 items.add(new QueueItem(i.relPath, f.size, f.sha256, i.id, i.version, i.update,
                         ItemState.WAITING, ""));

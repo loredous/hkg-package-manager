@@ -5,6 +5,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
+import hkgpackagemanager.core.CatalogReader;
+import hkgpackagemanager.core.CatalogView;
+import hkgpackagemanager.core.CatalogZips;
+import hkgpackagemanager.core.FileFingerprint;
 import hkgpackagemanager.core.ItemState;
 import hkgpackagemanager.core.Queue;
 import hkgpackagemanager.core.QueueCodec;
@@ -14,6 +18,7 @@ import hkgpackagemanager.core.QueueRunner;
 import hkgpackagemanager.core.QueueSession;
 import hkgpackagemanager.core.StickScanner;
 import hkgpackagemanager.core.StickZip;
+import hkgpackagemanager.core.ZipFingerprint;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -151,9 +156,16 @@ public class QueueService extends Service {
         }
         QueueSession s = session(app, cli, root);
         if (ACTION_START.equals(action)) {
-            List<StickZip> scan = StickScanner.scan(new File(root));
-            List<QueueItem> items = QueueItems.build(scan, intent.getStringArrayExtra(EXTRA_PATHS),
-                    intent.getBooleanArrayExtra(EXTRA_UPDATES));
+            List<CatalogView> views = CatalogReader.read(new File(root), new StateStore(app, cli).loadKeys(),
+                    new CatalogReader.Fingerprinter() {
+                        @Override public ZipFingerprint of(File f) throws IOException {
+                            return FileFingerprint.of(f);
+                        }
+                    });
+            List<StickZip> scan = new ArrayList<StickZip>(StickScanner.scan(new File(root)));
+            scan.addAll(CatalogZips.zips(views));
+            List<QueueItem> items = QueueItems.build(scan, CatalogZips.expected(views),
+                    intent.getStringArrayExtra(EXTRA_PATHS), intent.getBooleanArrayExtra(EXTRA_UPDATES));
             for (QueueItem i : items) {
                 if (i.state != ItemState.WAITING) log.log("not queued: " + i.relPath + ": " + i.message);
             }
