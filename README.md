@@ -28,8 +28,9 @@ build-tools `30.0.3`; JDK 17; `zip`; `python3`. `mksh` is optional (tests fall b
 6. `tools/build-kit.sh` (writes `dist/hkg-keycap-kit.zip`, the read-only key-capture kit)
 7. Optional: `tools/build-test-packages.sh` (writes `dist/test-packages/` for the checklist)
 
-**Back up `private/keys/hkgpm.jks` and its password file.** Android only accepts an update
-signed with the same key, so without them the next version can't update this install.
+**Back up `private/keys/hkgpm.jks` and its password file.** NEMESIS updates a package by
+uninstalling it first, so a lost key doesn't block updates; but keep the same key so every
+version you hand out is signed the same way and a plain `pm install -r` stays possible.
 
 Full test run:
 
