@@ -69,7 +69,7 @@ public class CatalogIndexTest {
         CatalogEntry g = c.entries.get(0);
         assertEquals("sample.green", g.id);
         assertNull(g.problem);
-        assertEquals(314L, g.size);
+        assertEquals(324L, g.size);
         assertEquals("zips/sample.green.zip", g.localPath());
         assertFalse(g.isRemote());
         assertEquals("NEEV23.*", g.compat.worksOn.get(0).build);
@@ -222,5 +222,11 @@ public class CatalogIndexTest {
         assertEquals("remote/a.b.zip", e.localPath());
         assertTrue(e.isRemote());
         assertEquals("https://h/p/x.zip", e.zip);
+    }
+
+    @Test public void deeplyNestedJsonIsCleanError() throws Exception {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 100000; i++) sb.append('[');
+        assertEquals("index.json is not valid JSON", refusal(sb.toString()));
     }
 }

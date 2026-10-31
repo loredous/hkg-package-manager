@@ -24,7 +24,7 @@ def _add(zf, name, data, mode):
 
 def package_zip(path, pkg_id, name, version, script_body, hook="postinstall"):
     """Write a NEMESIS package zip (stored, fixed timestamps) to path."""
-    data = "id=%s\nname=%s\nversion=%s\n" % (pkg_id, name, version)
+    data = "[nemesis]\nid=%s\nname=%s\nversion=%s\n" % (pkg_id, name, version)
     script = "#!/system/bin/sh\n" + script_body
     if not script.endswith("\n"):
         script += "\n"

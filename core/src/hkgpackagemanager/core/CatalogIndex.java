@@ -45,6 +45,10 @@ public final class CatalogIndex {
             root = new JSONObject(new String(bytes, start, bytes.length - start, "UTF-8"));
         } catch (JSONException e) {
             throw new BadCatalogException("index.json is not valid JSON");
+        } catch (RuntimeException e) {
+            throw new BadCatalogException("index.json is not valid JSON");
+        } catch (StackOverflowError e) {
+            throw new BadCatalogException("index.json is not valid JSON");
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException(e);
         }
