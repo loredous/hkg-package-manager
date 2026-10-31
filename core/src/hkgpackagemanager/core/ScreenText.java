@@ -18,6 +18,17 @@ public final class ScreenText {
     /** Discard asked for while the service runs a queue. */
     public static final String RUNNING_INFO = "An install is running.";
 
+    /** Yellow verdict line on the confirmation. */
+    public static final String YELLOW_WARNING = "This package hasn't been checked for this car.";
+    /** Red verdict line on the confirmation. */
+    public static final String RED_WARNING = "This package is marked as not working on this car.";
+    /** The tick a red package needs before it can be installed. */
+    public static final String RED_TICK = "I understand; install it anyway";
+    /** Header for the loose zips that are not from a catalog. */
+    public static final String LOOSE_HEADER = "Not from a catalog";
+    /** Button on an untrusted catalog's row. */
+    public static final String TRUST_BUTTON = "Trust this key";
+
     private ScreenText() {}
 
     /** `New`, `Update (installed X, drive Y)`, `Same version`, or the zip's problem. */
@@ -44,10 +55,51 @@ public final class ScreenText {
         return restoredDescriptor ? RESTORED_NOTE : null;
     }
 
-    /** `Update Name 1.2?` for one zip, with the self-update warning when the package is this manager. */
-    public static String singleConfirm(String action, PackageMeta meta) {
+    /** `Update Name 1.2?` for one zip, with the self-update warning for this manager, then the verdict's warning. */
+    public static String singleConfirm(String action, PackageMeta meta, Verdict v) {
         String q = action + " " + meta.name + (meta.version.length() == 0 ? "" : " " + meta.version) + "?";
-        return QueueOrder.SELF_ID.equals(meta.id) ? q + "\n\n" + SELF_UPDATE_WARNING : q;
+        if (QueueOrder.SELF_ID.equals(meta.id)) q += "\n\n" + SELF_UPDATE_WARNING;
+        if (v.colour == Colour.YELLOW) q += "\n\n" + YELLOW_WARNING + " (" + v.reason + ")";
+        if (v.colour == Colour.RED) q += "\n\n" + RED_WARNING + " (" + v.reason + ")";
+        return q;
+    }
+
+    /** The confirmation for the whole queue: the lines, the unchecked names, and the red-tick instruction. */
+    public static String queueConfirm(List<String> lines, List<String> yellowNames, int redCount) {
+        StringBuilder b = new StringBuilder("Install these packages?\n");
+        for (String l : lines) b.append("\n").append(l);
+        if (!yellowNames.isEmpty()) {
+            b.append("\n\nNot checked for this car: ");
+            for (int i = 0; i < yellowNames.size(); i++) b.append(i == 0 ? "" : ", ").append(yellowNames.get(i));
+        }
+        if (redCount > 0) b.append("\n\nTick each package marked as not working on this car to continue.");
+        return b.toString();
+    }
+
+    /** The reason text shown beside a package's colour. */
+    public static String verdictLine(Verdict v) {
+        return v.reason;
+    }
+
+    /** A key fingerprint in groups of four characters. */
+    public static String fingerprint(String hex) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < hex.length(); i += 4) {
+            if (i > 0) b.append(' ');
+            b.append(hex.substring(i, Math.min(hex.length(), i + 4)));
+        }
+        return b.toString();
+    }
+
+    /** The line shown for a catalog whose key is not trusted yet. */
+    public static String untrustedLine(String name, String hex) {
+        return "Untrusted catalog " + name + ", key fingerprint " + fingerprint(hex);
+    }
+
+    /** The confirmation before trusting a catalog's key. */
+    public static String trustConfirm(String name, String hex) {
+        return "Trust catalogs signed with this key?\n\n" + name + "\n" + fingerprint(hex)
+                + "\n\nCheck the fingerprint with the catalog's publisher first.";
     }
 
     /** The button label for a row: Update for UPDATE, Install otherwise. */

@@ -7,6 +7,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import hkgpackagemanager.core.CliResult;
+import hkgpackagemanager.core.CompatCheck;
 import hkgpackagemanager.core.InstallStep;
 import hkgpackagemanager.core.InstalledPackage;
 import hkgpackagemanager.core.ItemState;
@@ -189,7 +190,7 @@ final class DriveScreen implements Ui.Screen {
     private void confirmSingle(final StickZip z, final ZipStatus status) {
         if (refuseWhileRunning()) return;
         final String root = stick;
-        Ui.confirm(act, null, ScreenText.singleConfirm(ScreenText.actionLabel(status), z.meta),
+        Ui.confirm(act, null, ScreenText.singleConfirm(ScreenText.actionLabel(status), z.meta, CompatCheck.LOOSE),
                 ScreenText.actionLabel(status), new Runnable() {
                     public void run() { single(root, z, status != ZipStatus.NEW); }
                 }, "Cancel", null);
