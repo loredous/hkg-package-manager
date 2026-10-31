@@ -10,5 +10,36 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application android:label="HKG Package Manager">
+        <activity android:name="hkgpackagemanager.app.MainActivity"
+            android:label="HKG Package Manager"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service android:name="hkgpackagemanager.app.QueueService" android:exported="false" />
+
+        <!-- one action per string in core Button.allActions(); keep in step with Button.java -->
+        <receiver android:name="hkgpackagemanager.app.ButtonReceiver">
+            <intent-filter>
+                <action android:name="com.hkmc.intent.action.NAVI_SHORTCUT" />
+                <action android:name="com.mobis.intent.action.MEDIAGATE_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_BLUETOOTH_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_MUSIC_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_USB_AUDIO_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_USB_VIDEO_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_AUDIOCD_SHORTCUT" />
+                <action android:name="com.hkmc.intent.action.MEDIA_MCONNECT_SHORTCUT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name="hkgpackagemanager.app.MountReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_MOUNTED" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
