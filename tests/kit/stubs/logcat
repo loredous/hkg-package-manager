@@ -1,7 +1,16 @@
 #!/bin/sh
+# -d: the buffered log (before the drive was inserted). Without -d: a live feed that gives
+# one live-only line, then runs until it is killed (and records that it was).
 echo "10-30 08:32:40.001 V/ModeKeyDispatcher(  547): [Key] from Android - KeyEvent { action=ACTION_DOWN, keyCode=KEYCODE_SHORTCUT_MEDIA, scanCode=19, metaState=0 }"
 echo "10-30 08:32:40.002 D/BluetoothPbap( 900): contact Jane Doe 555-0100"
 echo "10-30 08:32:41.003 I/WindowManager( 600): sendBroadcastKeyEvent action=com.hkmc.intent.action.NAVI_SHORTCUT"
 echo "10-30 08:32:41.004 I/Bt( 901): addr 00:11:22:33:44:55"
 echo "10-30 08:32:42.005 W/MicomD ( 174): [micomd] send key fd = 14, keycode: 0x0005 press: 1"
 echo "10-30 08:32:43.006 D/ClimateManager( 1060): unrelated line"
+case " $* " in
+    *" -d "*) exit 0 ;;
+esac
+echo "10-30 08:33:00.007 V/ModeKeyDispatcher(  547): [Key] KEYCODE_LIVE_ONLY"
+[ -n "$FAKE_LIVE_FLAG" ] && : > "$FAKE_LIVE_FLAG"
+trap 'echo killed > "${FAKE_KILL_LOG:-/dev/null}"; exit 0' TERM
+while :; do /bin/sleep 0.1; done
