@@ -54,6 +54,24 @@ public class QueueSessionTest {
         assertNull(session().loadUnfinished());
     }
 
+    @Test public void catalogItemWithChangedHashFailsAtStart() throws Exception {
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        QueueItem cat = new QueueItem("a.zip", 5, "other-hash", "a.a", "1", false, ItemState.WAITING, "");
+        QueueRunner.Outcome o = session().start(Arrays.asList(cat));
+        assertEquals(ItemState.FAILED, o.queue.items.get(0).state);
+        assertEquals(Messages.MSG_CATALOG_MISMATCH, o.queue.items.get(0).message);
+        assertEquals(0, installCalls());
+    }
+
+    @Test public void catalogItemWithMatchingHashInstalls() throws Exception {
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        QueueItem cat = new QueueItem("a.zip", 5, "sha-a.zip", "a.a", "1", false, ItemState.WAITING, "");
+        QueueRunner.Outcome o = session().start(Arrays.asList(cat));
+        assertEquals(ItemState.DONE, o.queue.items.get(0).state);
+        assertEquals("sha-a.zip", o.queue.items.get(0).sha256);
+        assertEquals(1, installCalls());
+    }
+
     @Test public void startWithoutOriginalDescriptorRestoresNothing() throws Exception {
         nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
         QueueRunner.Outcome o = session().start(Arrays.asList(sel("a.zip", "a.a", "1")));

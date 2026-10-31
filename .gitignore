@@ -3,3 +3,4 @@ dist/
 private/
 .superpowers/
 .worktrees/
+__pycache__/

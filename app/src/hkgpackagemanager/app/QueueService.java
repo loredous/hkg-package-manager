@@ -14,11 +14,13 @@ import hkgpackagemanager.core.QueueRunner;
 import hkgpackagemanager.core.QueueSession;
 import hkgpackagemanager.core.StickScanner;
 import hkgpackagemanager.core.StickZip;
+import hkgpackagemanager.core.ZipFingerprint;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -152,8 +154,8 @@ public class QueueService extends Service {
         QueueSession s = session(app, cli, root);
         if (ACTION_START.equals(action)) {
             List<StickZip> scan = StickScanner.scan(new File(root));
-            List<QueueItem> items = QueueItems.build(scan, intent.getStringArrayExtra(EXTRA_PATHS),
-                    intent.getBooleanArrayExtra(EXTRA_UPDATES));
+            List<QueueItem> items = QueueItems.build(scan, Collections.<String, ZipFingerprint>emptyMap(),
+                    intent.getStringArrayExtra(EXTRA_PATHS), intent.getBooleanArrayExtra(EXTRA_UPDATES));
             for (QueueItem i : items) {
                 if (i.state != ItemState.WAITING) log.log("not queued: " + i.relPath + ": " + i.message);
             }
