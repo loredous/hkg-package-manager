@@ -2,6 +2,7 @@ package hkgpackagemanager.app;
 
 import android.content.Context;
 import hkgpackagemanager.core.CliResult;
+import hkgpackagemanager.core.MountTable;
 import hkgpackagemanager.core.Nemesis;
 import hkgpackagemanager.core.NemesisCalls;
 import hkgpackagemanager.core.ShellQuote;
@@ -19,6 +20,8 @@ import java.security.NoSuchAlgorithmException;
 
 /** The stick as files: direct writes first, root (via the NEMESIS CLI) when the app uid is refused. */
 public final class StickFs implements StickFiles, ZipCheck {
+    static final String NOT_MOUNTED = "USB drive not mounted";
+
     private final File stage;
     private final String root;
     private final Nemesis nemesis;
@@ -51,7 +54,44 @@ public final class StickFs implements StickFiles, ZipCheck {
         }
     }
 
+    /**
+     * Ruling R19: refuse to change anything unless the stick root is a mount point right now. A pulled
+     * stick leaves /storage/usbN as an empty folder on the /storage tmpfs; without this check the root
+     * fallback's mkdir -p would recreate HKGPM there (in RAM) and the queue would never stop.
+     */
+    private void requireMounted() throws IOException {
+        String mounts;
+        try {
+            mounts = readMounts();
+        } catch (IOException e) {
+            throw new IOException("USB drive not mounted (cannot read /proc/mounts: " + e.getMessage() + ")");
+        }
+        if (!MountTable.isMounted(mounts, root)) {
+            // keep the evidence in case this head unit names its mounts differently (R19's named risk)
+            StringBuilder usb = new StringBuilder();
+            for (String line : mounts.split("\n")) {
+                if (line.indexOf("usb") >= 0 || line.indexOf("media_rw") >= 0) usb.append("\n  ").append(line);
+            }
+            log.log("refused to change " + root + ": not in /proc/mounts" + (usb.length() == 0 ? "" : ":" + usb));
+            throw new IOException(NOT_MOUNTED);
+        }
+    }
+
+    private static String readMounts() throws IOException {
+        InputStream in = new FileInputStream("/proc/mounts");
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return new String(out.toByteArray(), "UTF-8");
+        } finally {
+            in.close();
+        }
+    }
+
     @Override public void writeAtomic(String rel, byte[] data) throws IOException {
+        requireMounted();
         try {
             writeDirect(rel, data);
             usedRoot = false;
@@ -101,6 +141,7 @@ public final class StickFs implements StickFiles, ZipCheck {
     }
 
     @Override public void move(String fromRel, String toRel) throws IOException {
+        requireMounted();
         File from = file(fromRel);
         File to = file(toRel);
         try {
@@ -118,6 +159,7 @@ public final class StickFs implements StickFiles, ZipCheck {
     }
 
     @Override public void delete(String rel) throws IOException {
+        requireMounted();
         File f = file(rel);
         try {
             if (!f.exists() || f.delete()) {
@@ -132,7 +174,7 @@ public final class StickFs implements StickFiles, ZipCheck {
     }
 
     private static void check(CliResult r) throws IOException {
-        if (r.exit != 0) throw new IOException(String.valueOf(r.lastLine()));
+        if (r.exit != 0) throw new IOException(r.lastLine() != null ? r.lastLine() : "exit " + r.exit);
     }
 
     @Override public ZipFingerprint fingerprint(String relPath) throws IOException {
