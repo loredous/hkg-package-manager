@@ -92,11 +92,8 @@ public final class StickFs implements StickFiles, ZipCheck {
         } finally {
             out.close();
         }
-        // FAT rename may not replace an existing file
-        if (target.exists() && !target.delete()) {
-            tmp.delete();
-            throw new IOException("cannot replace " + target);
-        }
+        // rename replaces an existing file (vfat, FUSE sdcard); never delete the target first, so a
+        // power loss leaves either the old or the new file. On failure the root path (cp + mv) takes over.
         if (!tmp.renameTo(target)) {
             tmp.delete();
             throw new IOException("cannot rename into " + target);
@@ -109,7 +106,6 @@ public final class StickFs implements StickFiles, ZipCheck {
         try {
             File dir = to.getParentFile();
             if (dir != null) dir.mkdirs();
-            if (to.exists()) to.delete();
             if (from.renameTo(to)) {
                 usedRoot = false;
                 return;
