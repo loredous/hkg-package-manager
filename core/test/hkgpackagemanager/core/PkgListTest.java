@@ -22,4 +22,11 @@ public class PkgListTest {
         assertEquals("x", PkgList.parse("a.b|A|0|x\r\n").get(0).types);
         assertEquals(0, PkgList.parse(null).size());
     }
+
+    @Test public void pipeInNameKeepsFieldsAligned() {
+        PkgListEntry e = PkgList.parse("x.y|A|B|1|service\n").get(0);
+        assertEquals("A|B", e.name);
+        assertTrue(e.locked);
+        assertEquals("service", e.types);
+    }
 }

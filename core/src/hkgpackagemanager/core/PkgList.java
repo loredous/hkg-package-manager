@@ -14,7 +14,9 @@ public final class PkgList {
             String line = raw.endsWith("\r") ? raw.substring(0, raw.length() - 1) : raw;
             String[] p = line.split("\\|", -1);
             if (p.length < 4 || p[0].length() == 0) continue;
-            out.add(new PkgListEntry(p[0], p[1], p[3], "1".equals(p[2].trim())));
+            StringBuilder name = new StringBuilder(p[1]);
+            for (int i = 2; i < p.length - 2; i++) name.append('|').append(p[i]);
+            out.add(new PkgListEntry(p[0], name.toString(), p[p.length - 1], "1".equals(p[p.length - 2].trim())));
         }
         return out;
     }
