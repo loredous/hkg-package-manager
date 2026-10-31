@@ -8,12 +8,11 @@ public final class QueueItems {
     private QueueItems() {}
 
     /**
-     * One WAITING item per requested path, taking id and version from the scan. A path that is not in
-     * the scan, or whose zip has a problem, is left out and a line about it is added to {@code skipped}.
-     * Size and hash stay empty: {@link QueueSession#start} fills them in.
+     * One item per requested path, taking id and version from the scan: WAITING when the zip is fine,
+     * FAILED (message = the problem) when it is missing or has a problem now, so the final report lists
+     * it. Size and hash stay empty: {@link QueueSession#start} fills them in for WAITING items.
      */
-    public static List<QueueItem> build(List<StickZip> scanned, String[] paths, boolean[] updates,
-            List<String> skipped) {
+    public static List<QueueItem> build(List<StickZip> scanned, String[] paths, boolean[] updates) {
         List<QueueItem> out = new ArrayList<QueueItem>();
         if (paths == null) return out;
         for (int i = 0; i < paths.length; i++) {
@@ -21,12 +20,13 @@ public final class QueueItems {
             for (StickZip s : scanned) {
                 if (s.relPath.equals(paths[i])) { z = s; break; }
             }
+            boolean update = updates != null && i < updates.length && updates[i];
             if (z == null) {
-                skipped.add(paths[i] + ": " + Messages.MSG_MISSING);
+                out.add(new QueueItem(paths[i], 0, "", paths[i], "", update, ItemState.FAILED, Messages.MSG_MISSING));
             } else if (z.problem != null || z.meta == null) {
-                skipped.add(paths[i] + ": " + (z.problem != null ? z.problem : "unreadable"));
+                out.add(new QueueItem(paths[i], 0, "", z.meta != null ? z.meta.id : paths[i], "", update,
+                        ItemState.FAILED, z.problem != null ? z.problem : "not a readable zip"));
             } else {
-                boolean update = updates != null && i < updates.length && updates[i];
                 out.add(new QueueItem(z.relPath, 0, "", z.meta.id, z.meta.version, update,
                         ItemState.WAITING, ""));
             }

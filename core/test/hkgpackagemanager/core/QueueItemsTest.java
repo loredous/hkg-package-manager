@@ -12,23 +12,21 @@ public class QueueItemsTest {
         return PackageMeta.from(IniFile.parse("[nemesis]\nid=" + id + "\nversion=" + ver + "\n"));
     }
 
-    @Test public void buildsWaitingItemsAndSkipsProblems() throws Exception {
+    @Test public void buildsWaitingItemsAndFailedItemsForProblems() throws Exception {
         List<StickZip> scan = Arrays.asList(
                 StickZip.ok("a.zip", 10, meta("hkg.a", "1.0")),
                 StickZip.problem("b.zip", 5, "not a readable zip"),
                 StickZip.ok("c.zip", 12, meta("hkg.c", "2.0")));
-        List<String> skipped = new ArrayList<String>();
         List<QueueItem> items = QueueItems.build(scan, new String[] {"c.zip", "b.zip", "a.zip", "gone.zip"},
-                new boolean[] {true, false, false, false}, skipped);
-        assertEquals(2, items.size());
+                new boolean[] {true, false, false, false});
+        assertEquals(4, items.size());
         assertEquals(new QueueItem("c.zip", 0, "", "hkg.c", "2.0", true, ItemState.WAITING, ""), items.get(0));
-        assertEquals(new QueueItem("a.zip", 0, "", "hkg.a", "1.0", false, ItemState.WAITING, ""), items.get(1));
-        assertEquals(2, skipped.size());
-        assertEquals("b.zip: not a readable zip", skipped.get(0));
-        assertEquals("gone.zip: " + Messages.MSG_MISSING, skipped.get(1));
+        assertEquals(new QueueItem("b.zip", 0, "", "b.zip", "", false, ItemState.FAILED, "not a readable zip"), items.get(1));
+        assertEquals(new QueueItem("a.zip", 0, "", "hkg.a", "1.0", false, ItemState.WAITING, ""), items.get(2));
+        assertEquals(new QueueItem("gone.zip", 0, "", "gone.zip", "", false, ItemState.FAILED, Messages.MSG_MISSING), items.get(3));
     }
 
     @Test public void nullPathsGiveNothing() {
-        assertTrue(QueueItems.build(new ArrayList<StickZip>(), null, null, new ArrayList<String>()).isEmpty());
+        assertTrue(QueueItems.build(new ArrayList<StickZip>(), null, null).isEmpty());
     }
 }

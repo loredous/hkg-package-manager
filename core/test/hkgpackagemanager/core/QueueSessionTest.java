@@ -60,6 +60,23 @@ public class QueueSessionTest {
         assertEquals(ItemState.DONE, o.queue.items.get(1).state);
     }
 
+    @Test public void startKeepsPreFailedItemsAndDoesNotInstallThem() throws Exception {
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        QueueItem bad = new QueueItem("bad.zip", 0, "", "bad.zip", "", false, ItemState.FAILED, "not a readable zip");
+        QueueRunner.Outcome o = session().start(Arrays.asList(bad, sel("a.zip", "a.a", "1")));
+        assertEquals(bad, o.queue.items.get(0));
+        assertEquals(ItemState.DONE, o.queue.items.get(1).state);
+        assertEquals(1, installCalls());
+    }
+
+    @Test public void startWithOnlyFailedItemsStillFinishes() throws Exception {
+        QueueItem bad = new QueueItem("bad.zip", 0, "", "bad.zip", "", false, ItemState.FAILED, "x");
+        QueueRunner.Outcome o = session().start(Arrays.asList(bad));
+        assertFalse(o.stopped);
+        assertTrue(o.queue.finished);
+        assertEquals(0, installCalls());
+    }
+
     @Test public void startOrdersSelfLast() throws Exception {
         nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
         nem.scriptInstallSuccess("/s/self.zip", "hkg.package.manager", "2");

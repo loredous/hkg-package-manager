@@ -36,6 +36,10 @@ public final class QueueSession {
         }
         List<QueueItem> items = new ArrayList<QueueItem>();
         for (QueueItem i : QueueOrder.order(selected)) {
+            if (i.state != ItemState.WAITING) { // already failed (e.g. a bad zip): keep it, never install it
+                items.add(i);
+                continue;
+            }
             ZipFingerprint f = check.fingerprint(i.relPath);
             if (f == null) {
                 items.add(new QueueItem(i.relPath, 0, "", i.id, i.version, i.update,

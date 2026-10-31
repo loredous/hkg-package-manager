@@ -5,6 +5,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
+import hkgpackagemanager.core.ItemState;
 import hkgpackagemanager.core.Queue;
 import hkgpackagemanager.core.QueueCodec;
 import hkgpackagemanager.core.QueueItem;
@@ -34,6 +35,8 @@ public class QueueService extends Service {
 
     private static final int NOTIFICATION_ID = 1;
     private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
+    private static final Object LOCK = new Object();
+    private static int lastStartId; // guarded by LOCK
     private static volatile Queue current;
     private static volatile QueueRunner.Outcome lastOutcome;
 
@@ -48,12 +51,20 @@ public class QueueService extends Service {
         String action = intent == null ? null : intent.getAction();
         if (action == null) {
             // restarted without a request; nothing to do
-            if (!RUNNING.get()) stopSelf();
+            synchronized (LOCK) {
+                lastStartId = startId;
+                if (!RUNNING.get()) stopSelfResult(startId);
+            }
             return START_NOT_STICKY;
         }
-        if (!RUNNING.compareAndSet(false, true)) {
-            log.log("ignored " + action + ": a queue is already running");
-            return START_NOT_STICKY;
+        synchronized (LOCK) {
+            lastStartId = startId;
+            if (!RUNNING.compareAndSet(false, true)) {
+                log.log("ignored " + action + ": a queue is already running");
+                return START_NOT_STICKY;
+            }
+            current = null;
+            lastOutcome = null;
         }
         startForeground(NOTIFICATION_ID, notification());
         final Context app = getApplicationContext();
@@ -82,10 +93,9 @@ public class QueueService extends Service {
             log.log("queue worker failed: " + e);
             Queue q = current;
             if (q == null) q = new Queue(false, new ArrayList<QueueItem>());
-            lastOutcome = new QueueRunner.Outcome(q, true, String.valueOf(e.getMessage()));
+            lastOutcome = new QueueRunner.Outcome(q, true, e.getMessage() != null ? e.getMessage() : e.toString());
             show = true;
         } finally {
-            RUNNING.set(false);
             broadcastChanged(app);
             if (show) {
                 Intent open = new Intent(app, MainActivity.class);
@@ -93,7 +103,12 @@ public class QueueService extends Service {
                 open.putExtra(MainActivity.EXTRA_PROGRESS, true);
                 app.startActivity(open);
             }
-            stopSelf();
+            // under the lock, so a request accepted after RUNNING clears can't be stopped mid-run:
+            // stopSelfResult is a no-op when a newer start has been delivered or is queued
+            synchronized (LOCK) {
+                RUNNING.set(false);
+                stopSelfResult(lastStartId);
+            }
         }
     }
 
@@ -122,11 +137,12 @@ public class QueueService extends Service {
         }
         QueueSession s = session(app, cli, root);
         if (ACTION_START.equals(action)) {
-            List<String> skipped = new ArrayList<String>();
             List<StickZip> scan = StickScanner.scan(new File(root));
             List<QueueItem> items = QueueItems.build(scan, intent.getStringArrayExtra(EXTRA_PATHS),
-                    intent.getBooleanArrayExtra(EXTRA_UPDATES), skipped);
-            for (String line : skipped) log.log("skipped " + line);
+                    intent.getBooleanArrayExtra(EXTRA_UPDATES));
+            for (QueueItem i : items) {
+                if (i.state != ItemState.WAITING) log.log("not queued: " + i.relPath + ": " + i.message);
+            }
             if (items.isEmpty()) {
                 log.log("nothing to install");
                 return false;
