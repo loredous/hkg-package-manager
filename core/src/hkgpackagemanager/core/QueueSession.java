@@ -60,7 +60,12 @@ public final class QueueSession {
         } catch (QueueCodec.Unreadable e) {
             throw new IOException("unreadable install list: " + e.getMessage());
         }
-        if (q == null) return null;
+        if (q == null) {
+            if (stick.exists(StickLayout.DESCRIPTOR) && DescriptorSwap.isOurs(stick.read(StickLayout.DESCRIPTOR))) {
+                DescriptorSwap.end(stick);
+            }
+            return null;
+        }
         q = runner.resolveInterrupted(q);
         store.save(q);
         listener.changed(q);
@@ -81,16 +86,19 @@ public final class QueueSession {
     }
 
     public void discard() throws IOException {
-        Queue q;
+        Queue q = null;
         try {
             q = loadUnfinished();
         } catch (QueueCodec.Unreadable e) {
-            q = null;
+            String bad = StickLayout.QUEUE + ".bad";
+            if (stick.exists(bad)) stick.delete(bad);
+            stick.move(StickLayout.QUEUE, bad);
         }
         if (q != null) {
+            q = runner.resolveInterrupted(q);
             for (int i = 0; i < q.items.size(); i++) {
                 QueueItem it = q.items.get(i);
-                if (it.state == ItemState.WAITING || it.state == ItemState.INSTALLING) {
+                if (it.state == ItemState.WAITING) {
                     q = q.withItem(i, it.withState(ItemState.FAILED, Messages.MSG_DISCARDED));
                 }
             }

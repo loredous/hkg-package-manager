@@ -119,7 +119,8 @@ public class QueueSessionTest {
         Queue r = QueueCodec.decode(stick.read("HKGPM/queue.json"));
         assertTrue(r.finished);
         assertEquals(ItemState.DONE, r.items.get(0).state);
-        assertEquals(Messages.MSG_DISCARDED, r.items.get(1).message);
+        assertEquals(Messages.MSG_INTERRUPTED, r.items.get(1).message);
+        assertEquals(Messages.MSG_DISCARDED, r.items.get(2).message);
         assertEquals(ItemState.FAILED, r.items.get(2).state);
         assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
         assertFalse(stick.exists("HKGPM/resume.sh"));
@@ -139,5 +140,33 @@ public class QueueSessionTest {
         } catch (QueueCodec.Unreadable expected) {
             // ok
         }
+    }
+
+    @Test public void discardResolvesInstallingItemThatDidInstall() throws Exception {
+        nem.setInstalled("b.b", "1");
+        Queue q = new Queue(false, Arrays.asList(sel("b.zip", "b.b", "1").withState(ItemState.INSTALLING, "")));
+        stick.writeAtomic("HKGPM/queue.json", QueueCodec.encode(q));
+        session().discard();
+        assertEquals(ItemState.DONE, QueueCodec.decode(stick.read("HKGPM/queue.json")).items.get(0).state);
+    }
+
+    @Test public void discardUnreadableQueueMovesItAside() throws Exception {
+        stick.put("HKGPM/queue.json", "garbage");
+        stick.put("HKGPM/queue.json.bad", "older");
+        session().discard();
+        assertFalse(stick.exists("HKGPM/queue.json"));
+        assertEquals("garbage", stick.text("HKGPM/queue.json.bad"));
+        assertNull(session().loadUnfinished());
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        assertTrue(session().start(Arrays.asList(sel("a.zip", "a.a", "1"))).queue.finished);
+    }
+
+    @Test public void resumeWithFinishedQueueRemovesOurLeftoverDescriptor() throws Exception {
+        stick.put("NEMESIS.data", "[nemesis]\nid=stick\n");
+        DescriptorSwap.begin(stick, script);
+        stick.writeAtomic("HKGPM/queue.json", QueueCodec.encode(new Queue(true, Arrays.asList(sel("a.zip", "a.a", "1")))));
+        assertNull(session().resume());
+        assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
+        assertFalse(stick.exists("HKGPM/resume.sh"));
     }
 }

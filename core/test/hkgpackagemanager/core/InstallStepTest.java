@@ -84,4 +84,11 @@ public class InstallStepTest {
         assertEquals(2, ids.size());
         assertTrue(ids.contains("c.d"));
     }
+
+    @Test public void exitZeroButNotListed() {
+        nem.scriptInstall("/storage/usb0/p/a.zip", 0, "ok installed a.b");
+        QueueItem r = step.perform(item("p/a.zip", "a.b", "1.0", false));
+        assertEquals(ItemState.FAILED, r.state);
+        assertEquals(Messages.MSG_NOT_LISTED, r.message);
+    }
 }

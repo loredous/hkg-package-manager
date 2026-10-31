@@ -23,7 +23,7 @@ public final class InstallStep {
         CliResult r = nemesis.install(abs, item.update);
         if (r.exit == 0) {
             if (!installedIds().contains(item.id)) {
-                return item.withState(ItemState.FAILED, Messages.installFailed(r));
+                return item.withState(ItemState.FAILED, Messages.MSG_NOT_LISTED);
             }
             String got = installedVersion(item.id);
             String want = item.version == null ? "" : item.version.trim();

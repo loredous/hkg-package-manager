@@ -9,6 +9,8 @@ public final class Messages {
     public static final String MSG_DISCARDED = "not installed (list discarded)";
     public static final String MSG_PATH_TOO_LONG = "path too long for NEMESIS";
 
+    public static final String MSG_NOT_LISTED = "install failed: NEMESIS does not list it after install";
+
     private Messages() {}
 
     public static String installFailed(CliResult r) {
