@@ -6,6 +6,7 @@ Not a publishing tool. Stdlib plus the openssl command line.
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -22,9 +23,16 @@ def _add(zf, name, data, mode):
     zf.writestr(info, data)
 
 
-def package_zip(path, pkg_id, name, version, script_body, hook="postinstall"):
-    """Write a NEMESIS package zip (stored, fixed timestamps) to path."""
+def package_zip(path, pkg_id, name, version, script_body, hook="postinstall",
+                declare_hook=False):
+    """Write a NEMESIS package zip (stored, fixed timestamps) to path.
+
+    declare_hook adds the `<hook>=scripts/<hook>.sh` line to NEMESIS.data, so NEMESIS runs the
+    script (the sample catalog's zips leave it out; they are never installed).
+    """
     data = "[nemesis]\nid=%s\nname=%s\nversion=%s\n" % (pkg_id, name, version)
+    if declare_hook:
+        data += "%s=scripts/%s.sh\n" % (hook, hook)
     script = "#!/system/bin/sh\n" + script_body
     if not script.endswith("\n"):
         script += "\n"
@@ -46,7 +54,7 @@ def _sha256_file(path):
 
 
 def build_catalog(folder, cat_id, name, publisher, packages, key_pem_path,
-                  generated="2026-11-01T00:00:00Z", zip_base_url=None):
+                  generated="2026-11-01T00:00:00Z", zip_base_url=None, declare_hook=False):
     """Write a catalog folder; return the key fingerprint."""
     zips = os.path.join(folder, "zips")
     os.makedirs(zips, exist_ok=True)
@@ -54,7 +62,8 @@ def build_catalog(folder, cat_id, name, publisher, packages, key_pem_path,
     for pkg in packages:
         entry = {k: v for k, v in pkg.items() if k != "script"}
         zpath = os.path.join(zips, pkg["id"] + ".zip")
-        package_zip(zpath, pkg["id"], pkg["name"], pkg["version"], pkg["script"])
+        package_zip(zpath, pkg["id"], pkg["name"], pkg["version"], pkg["script"],
+                    declare_hook=declare_hook)
         entry["size"] = os.path.getsize(zpath)
         entry["sha256"] = _sha256_file(zpath)
         if zip_base_url:
@@ -108,13 +117,79 @@ def build_sample(stick_root):
                          os.path.join(KEYS, "test-key.pem"))
 
 
+def car_packages():
+    def pkg(suffix, name, desc, script=None, **compat):
+        pid = "cartest." + suffix
+        p = {"id": pid, "name": name, "version": "1.0.0", "description": desc,
+             "author": "hkg-package-manager tests",
+             "script": script or 'echo "%s" > /data/nemesis/%s.marker\nexit 0' % (pid, pid)}
+        if compat:
+            p["compatibility"] = compat
+        return p
+    return [
+        pkg("green", "Car test green", "Works on builds NEEV23.*.",
+            works_on=[{"build": "NEEV23.*"}]),
+        pkg("wifi", "Car test wifi", "Works on cars with Wi-Fi.",
+            works_on=[{"hardware": ["wifi"]}]),
+        pkg("yellow", "Car test yellow", "No compatibility data."),
+        pkg("red", "Car test red", "Marked as not working anywhere.",
+            not_on=[{"build": "*"}]),
+        pkg("conflict", "Car test conflict", "Conflicts with test.a.",
+            conflicts=["test.a"]),
+        pkg("restart", "Car test restart", "Restarts the head unit.",
+            script="echo \"cartest.restart: restarting\"\nexec /system/bin/reboot",
+            works_on=[{"build": "*"}]),
+    ]
+
+
+def _flip(path, marker):
+    """Change one byte of the file, at the first occurrence of marker."""
+    with open(path, "rb") as f:
+        data = bytearray(f.read())
+    at = bytes(data).index(marker)
+    data[at] ^= 0x01
+    with open(path, "wb") as f:
+        f.write(bytes(data))
+
+
+def build_car(out_dir):
+    """Write the stick-ready scenario trees under out_dir (emptied first)."""
+    shutil.rmtree(out_dir, ignore_errors=True)
+    cat = os.path.join("HKGPM", "catalogs", "cartest")
+    trusted = os.path.join(out_dir, "trusted")
+    folder = os.path.join(trusted, cat)
+    os.makedirs(folder)
+    key = os.path.join(KEYS, "test-key.pem")
+    build_catalog(folder, "cartest", "Car test catalog", "hkg-package-manager tests",
+                  car_packages(), key, declare_hook=True)
+    keys = os.path.join(trusted, "HKGPM", "keys")
+    os.makedirs(keys)
+    shutil.copyfile(os.path.join(folder, "key.pem"), os.path.join(keys, "test-key.pem"))
+    package_zip(os.path.join(trusted, "test.a.zip"), "test.a", "Test A", "1.0.0",
+                'echo "test.a" > /data/nemesis/test.a.marker\nexit 0', declare_hook=True)
+
+    bad_index = os.path.join(out_dir, "tampered-index", cat)
+    shutil.copytree(folder, bad_index)
+    _flip(os.path.join(bad_index, "index.json"), b"Car test green")
+
+    bad_zip = os.path.join(out_dir, "tampered-zip", cat)
+    shutil.copytree(folder, bad_zip)
+    _flip(os.path.join(bad_zip, "zips", "cartest.yellow.zip"), b"exit 0")
+
+    other = os.path.join(out_dir, "unknown-key", "HKGPM", "catalogs", "othertest")
+    os.makedirs(other)
+    build_catalog(other, "othertest", "Car test catalog (other key)",
+                  "hkg-package-manager tests", car_packages(),
+                  os.path.join(KEYS, "other-test-key.pem"), declare_hook=True)
+
+
 def main(argv):
     if len(argv) == 3 and argv[1] == "sample":
         print(build_sample(argv[2]))
         return 0
     if len(argv) == 3 and argv[1] == "car":
-        sys.stderr.write("car: not yet\n")
-        return 2
+        build_car(argv[2])
+        return 0
     sys.stderr.write("usage: make_catalog.py sample <stick-root> | car <out-dir>\n")
     return 2
 
