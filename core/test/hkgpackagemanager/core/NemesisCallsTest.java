@@ -33,9 +33,10 @@ public class NemesisCallsTest {
             NemesisCalls.copyIntoCommand("/data/data/hkgpackagemanager.app/files/s/q", "/storage/usb0/HKGPM/queue.json"));
     }
     @Test public void daemonArgLimit() {
-        assertTrue(NemesisCalls.fitsDaemon(list(repeat('a', 768))));
-        assertFalse(NemesisCalls.fitsDaemon(list(repeat('a', 769))));
-        assertFalse(NemesisCalls.fitsDaemon(list(repeat('é', 385))));
+        assertTrue(NemesisCalls.fitsDaemon(list(repeat('a', 767))));
+        assertFalse(NemesisCalls.fitsDaemon(list(repeat('a', 768))));
+        assertTrue(NemesisCalls.fitsDaemon(list(repeat('é', 383))));
+        assertFalse(NemesisCalls.fitsDaemon(list(repeat('é', 384))));
     }
     @Test public void metaPath() {
         assertEquals("/data/nemesis/apps/hkg.x/NEMESIS.data", NemesisCalls.installedMetaPath("hkg.x"));

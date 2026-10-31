@@ -7,8 +7,8 @@ import java.util.List;
 
 /** Builds argv lists and root shell commands for the NEMESIS CLI. Pure; nothing here runs anything. */
 public final class NemesisCalls {
-    /** Per-argument limit of the NEMESIS daemon (SU_MAX_ARG). */
-    public static final int MAX_ARG_BYTES = 768;
+    /** Longest argument the NEMESIS daemon accepts: SU_MAX_ARG is 768 but su.c rd_str rejects n >= cap, so 767 bytes. */
+    public static final int MAX_ARG_BYTES = 767;
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
     private NemesisCalls() {}
