@@ -2,16 +2,18 @@
 # Build the signed app APK: compile core/src and app/src against android.jar, dex them, package
 # with the manifest and assets/resume.sh, zipalign and sign (v1 only).
 # usage: tools/build-app.sh           writes build/app/hkgpm.apk and prints its path
-# environment: VERSION_NAME (default 1.0.0), VERSION_CODE (default 1). They replace the values in
-# app/AndroidManifest.xml (--replace-version), so keep the defaults and the manifest in step.
+# The version comes from app/AndroidManifest.xml. To build another one (the checklist's update
+# test), set VERSION_NAME and/or VERSION_CODE: each one set replaces that value (--replace-version).
 # The signing key is private/keys/hkgpm.jks (alias hkgpm), created on the first run with
 # a random password in private/keys/password. Keep the key: an update must be signed with it.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 eval "$("$ROOT/tools/toolchain.sh" env)"
 cd "$ROOT"
-VERSION_NAME=${VERSION_NAME:-1.0.0}
-VERSION_CODE=${VERSION_CODE:-1}
+VERSION_ARGS=
+if [ -n "${VERSION_NAME:-}" ]; then VERSION_ARGS="$VERSION_ARGS --version-name $VERSION_NAME"; fi
+if [ -n "${VERSION_CODE:-}" ]; then VERSION_ARGS="$VERSION_ARGS --version-code $VERSION_CODE"; fi
+if [ -n "$VERSION_ARGS" ]; then VERSION_ARGS="$VERSION_ARGS --replace-version"; fi
 
 OUT=build/app
 rm -rf "$OUT"
@@ -27,8 +29,9 @@ javac -encoding UTF-8 -source 8 -target 8 -Xlint:-options -bootclasspath "$ANDRO
     $(find "$OUT/classes" -name '*.class' | sort)
 
 cp stick/resume.sh "$OUT/assets/resume.sh"
+# shellcheck disable=SC2086 # VERSION_ARGS is a word list; the values are version strings
 "$BUILD_TOOLS/aapt" package -f -M app/AndroidManifest.xml -I "$ANDROID_JAR" -A "$OUT/assets" \
-    --version-name "$VERSION_NAME" --version-code "$VERSION_CODE" --replace-version -F "$OUT/unsigned.apk"
+    $VERSION_ARGS -F "$OUT/unsigned.apk"
 (cd "$OUT" && "$BUILD_TOOLS/aapt" add -k unsigned.apk classes.dex > /dev/null)
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
 

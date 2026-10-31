@@ -43,7 +43,7 @@ A field of a known name with the wrong type makes that package entry invalid.
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `id` | string | yes | Package id. |
+| `id` | string | yes | Package id: 1 to 64 characters of `A-Z a-z 0-9 . _ -`, not starting with `.` and with no `..` (the same rule as the catalog id). |
 | `name` | string | yes | Display name. |
 | `version` | string | yes | Version text. |
 | `description` | string | yes | Short description. |
@@ -53,6 +53,9 @@ A field of a known name with the wrong type makes that package entry invalid.
 | `size` | integer | yes | Size of the zip in bytes, 0 or more. |
 | `sha256` | string | yes | SHA-256 of the zip, 64 hex characters (either case). |
 | `compatibility` | object | no | See below. |
+
+A package id may appear once in a catalog. A later entry with an id already used earlier in
+the same catalog is invalid (shown, not installable).
 
 A relative `zip` uses `/` separators, does not start with `/` or `remote/`, contains no `\`,
 and has no empty, `.` or `..` segment. Any other URL scheme makes the entry invalid.

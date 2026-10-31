@@ -1,6 +1,6 @@
 # hkg.package.manager: design
 
-Status: draft, 2026-10-30. Owner: the contributor who requested it (2023 US Ioniq 5,
+Status: Phase 1 released (v1.0.0); Phase 2 built, not yet tried on the car. Owner: the contributor who requested it (2023 US Ioniq 5,
 `NEEV23.USA.`, firmware 260507, NEMESIS installed). Working folder: `hkg-plugin-manager`.
 Audience: **any Gen5W head unit with NEMESIS** *(owner)*. On-car testing is on the owner's
 Ioniq 5; other cars are best effort.
