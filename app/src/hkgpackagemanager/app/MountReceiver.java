@@ -11,11 +11,7 @@ public class MountReceiver extends BroadcastReceiver {
     @Override public void onReceive(final Context context, Intent intent) {
         if (intent == null || intent.getData() == null) return;
         final String path = intent.getData().getPath();
-        boolean isStick = false;
-        for (int i = 0; i <= 2; i++) {
-            if (("/storage/usb" + i).equals(path)) isStick = true;
-        }
-        if (!isStick || QueueService.isRunning()) return;
+        if (!Sticks.isStickRoot(path) || QueueService.isRunning()) return;
         final PendingResult pending = goAsync();
         new Thread(new Runnable() {
             public void run() {
@@ -46,7 +42,6 @@ public class MountReceiver extends BroadcastReceiver {
         if (!unfinished || QueueService.isRunning()) return;
         Intent open = new Intent(context, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        open.putExtra(MainActivity.EXTRA_RESUME, true);
         open.putExtra(MainActivity.EXTRA_ROOT, path);
         context.startActivity(open);
     }
