@@ -96,18 +96,26 @@ public class QueueService extends Service {
             lastOutcome = new QueueRunner.Outcome(q, true, e.getMessage() != null ? e.getMessage() : e.toString());
             show = true;
         } finally {
-            broadcastChanged(app);
-            if (show) {
-                Intent open = new Intent(app, MainActivity.class);
-                open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                open.putExtra(MainActivity.EXTRA_PROGRESS, true);
-                app.startActivity(open);
-            }
-            // under the lock, so a request accepted after RUNNING clears can't be stopped mid-run:
+            // first, under the lock, so a request accepted after RUNNING clears can't be stopped mid-run:
             // stopSelfResult is a no-op when a newer start has been delivered or is queued
             synchronized (LOCK) {
                 RUNNING.set(false);
                 stopSelfResult(lastStartId);
+            }
+            try {
+                broadcastChanged(app);
+            } catch (RuntimeException e) {
+                log.log("final broadcast failed: " + e);
+            }
+            if (show) {
+                try {
+                    Intent open = new Intent(app, MainActivity.class);
+                    open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    open.putExtra(MainActivity.EXTRA_PROGRESS, true);
+                    app.startActivity(open);
+                } catch (RuntimeException e) {
+                    log.log("cannot open the progress screen: " + e);
+                }
             }
         }
     }
