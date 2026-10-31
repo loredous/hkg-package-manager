@@ -2,6 +2,7 @@ package hkgpackagemanager.app;
 
 import android.content.Context;
 import hkgpackagemanager.core.CliResult;
+import hkgpackagemanager.core.FileFingerprint;
 import hkgpackagemanager.core.MountTable;
 import hkgpackagemanager.core.Nemesis;
 import hkgpackagemanager.core.NemesisCalls;
@@ -15,8 +16,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /** The stick as files: direct writes first, root (via the NEMESIS CLI) when the app uid is refused. */
 public final class StickFs implements StickFiles, ZipCheck {
@@ -178,30 +177,6 @@ public final class StickFs implements StickFiles, ZipCheck {
     }
 
     @Override public ZipFingerprint fingerprint(String relPath) throws IOException {
-        File f = file(relPath);
-        if (!f.isFile()) return null;
-        MessageDigest md;
-        try {
-            md = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IOException("no SHA-256");
-        }
-        long size = 0;
-        InputStream in = new FileInputStream(f);
-        try {
-            byte[] buf = new byte[64 * 1024];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                md.update(buf, 0, n);
-                size += n;
-            }
-        } finally {
-            in.close();
-        }
-        StringBuilder hex = new StringBuilder();
-        for (byte b : md.digest()) {
-            hex.append(Character.forDigit((b >> 4) & 0xf, 16)).append(Character.forDigit(b & 0xf, 16));
-        }
-        return new ZipFingerprint(size, hex.toString());
+        return FileFingerprint.of(file(relPath));
     }
 }
