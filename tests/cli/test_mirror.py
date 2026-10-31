@@ -196,6 +196,83 @@ class MirrorTest(Base):
         self.assertEqual(self.run_cli()[0], 2)
 
 
+class HostileTest(Base):
+    GOOD = "a" * 64
+
+    def entry(self, **kw):
+        e = {"id": "x.y", "zip": "zips/x.zip", "size": 1, "sha256": self.GOOD}
+        e.update(kw)
+        return e
+
+    def parsed(self, e):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            r = hkgpm_mirror.parse_entries({"packages": [e]})
+        return r, err.getvalue()
+
+    def test_good_entry_is_accepted(self):
+        r, err = self.parsed(self.entry())
+        self.assertEqual((len(r), err), (1, ""))
+        r, _ = self.parsed(self.entry(zip="https://h/x.zip", sha256="A" * 64))
+        self.assertEqual(r[0][1:], ("remote/x.y.zip", "https://h/x.zip", 1, "a" * 64))
+
+    def test_hostile_values_are_skipped_with_a_warning(self):
+        bad = [{"id": i} for i in ["x\n", "../x", ".x", "a..b", "a" * 65, "", "a/b", 5]]
+        bad += [{"zip": z} for z in ["../x.zip", "/x.zip", "a\\b.zip", "a//b.zip", "a/./b.zip",
+                                     "remote/x.zip", "ftp://h/x.zip", "", "a/",
+                                     "index.json", "KEY.PEM", "Index.Json.Sig", "zips/a.zip.part",
+                                     "A.PART", 7]]
+        bad += [{"size": v} for v in ["12", -1, 1.5, True, None]]
+        bad += [{"sha256": v} for v in ["a" * 63, "a" * 64 + "\n", "g" * 64, "a" * 65, 5]]
+        for patch in bad:
+            r, err = self.parsed(self.entry(**patch))
+            self.assertEqual(r, [], patch)
+            self.assertIn("warning", err, patch)
+
+    def test_id_and_location_helpers(self):
+        self.assertFalse(hkgpm_mirror.valid_id("x\n"))
+        self.assertTrue(hkgpm_mirror.valid_id("a-b_c.1"))
+        self.assertIsNone(hkgpm_mirror.local_path_for("x", "a\\b.zip"))
+        self.assertEqual(hkgpm_mirror.local_path_for("x", "http://h/z"), "remote/x.zip")
+
+    def resign(self, src, **changes):
+        import json
+        p = os.path.join(src, "index.json")
+        idx = json.loads(read(p).decode())
+        idx.update(changes)
+        with open(p, "wb") as f:
+            f.write((json.dumps(idx, sort_keys=True) + "\n").encode())
+        make_catalog._openssl("dgst", "-sha256", "-sign", KEY,
+                              "-out", os.path.join(src, "index.json.sig"), p)
+
+    def test_format_2_exits_1_and_writes_nothing(self):
+        src = self.build()
+        self.resign(src, format=2)
+        code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+        self.assertEqual(code, 1)
+        self.assertIn("newer", err)
+        self.assertEqual(os.listdir(self.stick), [])
+        self.assertFalse(os.path.exists(self.trusted_file()))
+
+    def test_key_mismatch_exits_1_and_writes_nothing(self):
+        src = self.build()
+        self.resign(src, key="b" * 64)
+        code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+        self.assertEqual(code, 1)
+        self.assertIn("key", err)
+        self.assertEqual(os.listdir(self.stick), [])
+        self.assertFalse(os.path.exists(self.trusted_file()))
+
+    def test_oversized_index_exits_1(self):
+        src = self.build()
+        with open(os.path.join(src, "index.json"), "ab") as f:
+            f.write(b" " * (2 * 1024 * 1024))
+        code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+        self.assertEqual(code, 1)
+        self.assertIn("larger than", err)
+        self.assertEqual(os.listdir(self.stick), [])
+
+
 class UrlTest(Base):
     def serve(self, folder, handler=QuietHandler):
         def h(*a, **kw):
@@ -229,6 +306,19 @@ class UrlTest(Base):
                          read(os.path.join(src, "zips", "sample.green.zip")))
         self.assertEqual(t["index.json"], read(os.path.join(src, "index.json")))
         self.assertEqual(len(t), 8)
+
+    def test_redirect_to_non_http_is_refused(self):
+        class Redir(QuietHandler):
+            def do_GET(self):
+                self.send_response(302)
+                self.send_header("Location", "ftp://127.0.0.1/index.json")
+                self.end_headers()
+
+        base = self.serve(self.tmp, Redir)
+        code, _, err = self.run_cli(base, self.stick, "--fingerprint", self.fp)
+        self.assertEqual(code, 1)
+        self.assertIn("can't read the catalog", err)
+        self.assertEqual(os.listdir(self.stick), [])
 
     def test_interruptedDownloadLeavesNoFinalFile(self):
         web = os.path.join(self.tmp, "web")

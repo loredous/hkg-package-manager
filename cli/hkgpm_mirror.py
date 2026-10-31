@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -22,6 +23,9 @@ ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
 CATALOG_FILES = ("key.pem", "index.json.sig", "index.json")
 CHUNK = 65536
+MAX_INDEX = 2 * 1024 * 1024
+MAX_SMALL = 16 * 1024
+RESERVED = ("index.json", "index.json.sig", "key.pem")
 
 
 class Fail(Exception):
@@ -129,7 +133,7 @@ def load_trusted():
         with open(trusted_path(), encoding="utf-8") as f:
             for line in f:
                 head = line.split(" ", 1)[0].strip()
-                if re.match(r"^[0-9a-f]{64}$", head):
+                if re.fullmatch(r"[0-9a-f]{64}", head):
                     keys.add(head)
     except OSError:
         pass
@@ -153,7 +157,7 @@ def store_trusted(fp, label):
 # ---- ids and locations ----
 
 def valid_id(s):
-    return (isinstance(s, str) and ID_RE.match(s) is not None
+    return (isinstance(s, str) and ID_RE.fullmatch(s) is not None
             and not s.startswith(".") and ".." not in s)
 
 
@@ -167,6 +171,9 @@ def local_path_for(entry_id, zip_loc):
         return "remote/%s.zip" % entry_id
     if (not zip_loc or zip_loc.startswith("/") or "\\" in zip_loc
             or zip_loc.startswith("remote/") or "://" in zip_loc):
+        return None
+    low = zip_loc.lower()  # sticks are FAT/exFAT: names compare case-insensitively
+    if low in RESERVED or low.endswith(".part"):
         return None
     for seg in zip_loc.split("/"):
         if seg in ("", ".", ".."):
@@ -190,18 +197,30 @@ def join_source(src, rel):
     return os.path.join(src, *rel.split("/"))
 
 
+class _HttpOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_url(newurl):
+            raise urllib.error.URLError("redirect to a non-http(s) address refused")
+        return urllib.request.HTTPRedirectHandler.redirect_request(
+            self, req, fp, code, msg, headers, newurl)
+
+
 def open_stream(loc):
     if is_url(loc):
-        return urllib.request.urlopen(loc, timeout=30)
+        opener = urllib.request.build_opener(_HttpOnlyRedirect)
+        return opener.open(loc, timeout=30)
     return open(loc, "rb")
 
 
-def read_all(loc):
+def read_all(loc, cap):
     f = open_stream(loc)
     try:
-        return f.read()
+        data = f.read(cap + 1)
     finally:
         f.close()
+    if len(data) > cap:
+        raise Fail("%s is larger than %d bytes" % (os.path.basename(loc), cap))
+    return data
 
 
 def file_ok(path, size, sha):
@@ -269,7 +288,7 @@ def parse_entries(index):
             local = local_path_for(pid, zloc)
         if (local is None or pid in seen or isinstance(size, bool)
                 or not isinstance(size, int) or size < 0
-                or not isinstance(sha, str) or not HEX64.match(sha)):
+                or not isinstance(sha, str) or not HEX64.fullmatch(sha)):
             sys.stderr.write("warning: skipping invalid entry %r\n" % (pid,))
             continue
         seen.add(pid)
@@ -279,9 +298,11 @@ def parse_entries(index):
 
 def mirror(src, stick, only, fp_arg):
     try:
-        index_raw = read_all(join_source(src, "index.json"))
-        sig = read_all(join_source(src, "index.json.sig"))
-        key_pem = read_all(join_source(src, "key.pem"))
+        index_raw = read_all(join_source(src, "index.json"), MAX_INDEX)
+        sig = read_all(join_source(src, "index.json.sig"), MAX_SMALL)
+        key_pem = read_all(join_source(src, "key.pem"), MAX_SMALL)
+    except Fail:
+        raise
     except Exception as e:
         raise Fail("can't read the catalog: %s" % e)
     try:

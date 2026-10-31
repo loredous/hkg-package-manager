@@ -18,7 +18,8 @@ The catalog's `key.pem` must match the index's `key` and the signature must veri
 must be trusted: listed in `trusted-keys.txt` in `$HKGPM_CONFIG_DIR`, else
 `$XDG_CONFIG_HOME/hkg-package-manager`, else `~/.config/hkg-package-manager`
 (one `<64 hex> <label>` per line). For a new key the tool prints the fingerprint and stops;
-check it with the publisher, then re-run with `--fingerprint <fp>`, which stores it.
+check it with the publisher, then re-run with `--fingerprint <fp>`, which stores it. The key is stored at once, even if the run then fails
+(for example on a bad zip); remove the line from `trusted-keys.txt` to undo.
 Nothing is written to the stick before the trust check passes.
 
 ## Exit codes
