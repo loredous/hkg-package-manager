@@ -30,7 +30,7 @@ fresh_root() {
 # run_hook <script>: sets RC; hooks run from a scratch cwd like NEMESIS does
 run_hook() {
     RC=0
-    (cd "$T" && PM_SYSROOT=$T/root PM_TEST_PATH=$STUBS PM_STUB_LOG=$T/stub.log \
+    (cd "$T" && PM_SYSROOT=$T/root PM_TEST_PATH="$STUBS:/usr/bin:/bin" PM_STUB_LOG=$T/stub.log \
         $MOCK_SH "$ROOT/package/scripts/$1" > "$T/out.txt" 2>&1) || RC=$?
 }
 STATE=$T/root/data/nemesis/hkg.package.manager
