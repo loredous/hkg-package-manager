@@ -208,7 +208,7 @@ final class DriveScreen implements Ui.Screen {
         }, new Ui.Done<String>() {
             public void done(String msg) {
                 busy = false;
-                wait.dismiss();
+                Ui.dismiss(wait);
                 Ui.info(act, null, msg == null ? "Install failed." : msg);
                 refresh();
             }

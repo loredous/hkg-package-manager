@@ -6,6 +6,7 @@ import java.util.Map;
 /** The wording and small decisions the screens share, kept out of the Android classes so they can be tested. */
 public final class ScreenText {
     public static final String HANDLER_NOTE = "If NEMESIS asks to run an item from the USB drive, either answer is fine.";
+    public static final String KEEP_DRIVE = "Don't remove the USB drive until the list finishes.";
     public static final String RESUME_PROMPT = "Unfinished install found: continue?";
     public static final String RESTART_LINE = "Restart the head unit to finish.";
     public static final String CONFLICT_LINE = "NEMESIS Manager may also open on this button.";

@@ -25,6 +25,7 @@ final class ProgressScreen implements Ui.Screen {
     @Override public void refresh() {
         content.removeAllViews();
         content.addView(Ui.text(ctx, ScreenText.HANDLER_NOTE));
+        if (QueueService.isRunning()) content.addView(Ui.bold(ctx, ScreenText.KEEP_DRIVE));
         Queue q = QueueService.current();
         QueueRunner.Outcome o = QueueService.lastOutcome();
         if (q == null && o != null) q = o.queue;

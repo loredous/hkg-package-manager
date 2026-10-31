@@ -148,6 +148,8 @@ public class MainActivity extends Activity {
                     public void run() { discard(f.root); }
                 }, "Keep", new Runnable() {
                     public void run() { show(TAB_DRIVE); }
+                }, new Runnable() {
+                    public void run() { show(TAB_DRIVE); }
                 });
     }
 
@@ -163,6 +165,8 @@ public class MainActivity extends Activity {
             }
         }, "Discard", new Runnable() {
             public void run() { discard(f.root); }
+        }, new Runnable() {
+            public void run() { show(TAB_DRIVE); } // Back or an outside tap keeps the list
         });
     }
 

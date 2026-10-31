@@ -51,11 +51,25 @@ final class Ui {
                 final T r = result;
                 MAIN.post(new Runnable() {
                     public void run() {
-                        if (!a.isFinishing()) done.done(r);
+                        if (alive(a)) done.done(r);
                     }
                 });
             }
         }, "hkgpm-ui").start();
+    }
+
+    /** False once the activity is finishing or destroyed (a recreation destroys it without finishing). */
+    static boolean alive(Activity a) {
+        return !a.isFinishing() && !a.isDestroyed();
+    }
+
+    /** Dismisses a dialog if it is still showing; never throws. */
+    static void dismiss(android.app.Dialog d) {
+        try {
+            if (d.isShowing()) d.dismiss();
+        } catch (RuntimeException e) {
+            // its window is already gone
+        }
     }
 
     static TextView text(Context c, String s) {
@@ -107,9 +121,15 @@ final class Ui {
         confirm(a, title, message, "OK", null, null, null);
     }
 
-    /** A dialog with big text. {@code no} may be null for a single-button dialog; cancelling runs {@code onNo}. */
+    /** A dialog with big text. {@code no} may be null for a single-button dialog; cancelling does nothing unless {@code onCancel} is given. */
+    static void confirm(Activity a, String title, String message, String yes, Runnable onYes,
+            String no, Runnable onNo) {
+        confirm(a, title, message, yes, onYes, no, onNo, null);
+    }
+
+    /** As above; Back or a tap outside runs only {@code onCancel} (never {@code onNo}, so cancelling can't discard). */
     static void confirm(Activity a, String title, String message, String yes, final Runnable onYes,
-            String no, final Runnable onNo) {
+            String no, final Runnable onNo, final Runnable onCancel) {
         AlertDialog.Builder b = new AlertDialog.Builder(a);
         if (title != null) b.setTitle(title);
         b.setView(scroll(a, wrap(a, message)));
@@ -122,7 +142,7 @@ final class Ui {
             });
         }
         b.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            public void onCancel(DialogInterface d) { if (onNo != null) onNo.run(); }
+            public void onCancel(DialogInterface d) { if (onCancel != null) onCancel.run(); }
         });
         AlertDialog d = b.create();
         d.show();

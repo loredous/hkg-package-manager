@@ -54,6 +54,10 @@ public class ScreenTextTest {
                 ScreenText.preferredFirst(Arrays.asList("/storage/usb0", "/storage/usb1"), "/storage/usb1"));
     }
 
+    @Test public void keepDriveNote() {
+        assertEquals("Don't remove the USB drive until the list finishes.", ScreenText.KEEP_DRIVE);
+    }
+
     @Test public void messages() {
         assertEquals("Remove the other USB drive (/storage/usb1) first: NEMESIS only reads one drive.",
                 ScreenText.otherDriveMessage("/storage/usb1"));

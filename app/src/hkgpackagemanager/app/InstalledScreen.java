@@ -111,7 +111,7 @@ final class InstalledScreen implements Ui.Screen {
         }, new Ui.Done<String>() {
             public void done(String text) {
                 busy = false;
-                wait.dismiss();
+                Ui.dismiss(wait);
                 Ui.info(act, null, text == null ? "Uninstall failed." : text);
                 refresh();
             }
