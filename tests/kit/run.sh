@@ -19,14 +19,15 @@ trap 'rm -rf "$T"' EXIT
 
 D=$T/drive; TMPD=$T/tmp; mkdir -p "$D" "$TMPD"
 cp "$ROOT/kit/NEMESIS.sh" "$D/" 2>/dev/null
+TO=; command -v timeout > /dev/null 2>&1 && TO="timeout 60"
 (cd "$D" && KIT_TMP=$TMPD KIT_TEST_PATH="$STUBS:/usr/bin:/bin" FAKE_AM_LOG=$T/am.log FAKE_LIVE_FLAG=$T/live.flag FAKE_KILL_LOG=$T/kill.log \
-    sh NEMESIS.sh > "$T/kit.out" 2>&1)
+    $TO sh NEMESIS.sh > "$T/kit.out" 2>&1)
 O=$D/KEYCAP
 
 check "keys: media key line"       grep -q 'KEYCODE_SHORTCUT_MEDIA' "$O/keys.txt"
 check "keys: navi shortcut line"   grep -q 'NAVI_SHORTCUT' "$O/keys.txt"
 check "keys: micom line"           grep -q 'MicomD' "$O/keys.txt"
-check "keys: live-only line"      grep -q KEYCODE_LIVE_ONLY "$O/keys.txt"
+check "keys: live-only line"       grep -q KEYCODE_LIVE_ONLY "$O/keys.txt"
 check "live logcat was killed"     grep -q killed "$T/kill.log"
 check "keys: no contact name"      sh -c "test -s '$O/keys.txt' && ! grep -q 'Jane Doe' '$O/keys.txt'"
 check "keys: no bluetooth address" sh -c "test -s '$O/keys.txt' && ! grep -q '00:11:22:33:44:55' '$O/keys.txt'"

@@ -3,7 +3,7 @@
 # written its line, so the kit's kill cannot race it.
 _n=0
 while [ -n "$FAKE_LIVE_FLAG" ] && [ ! -e "$FAKE_LIVE_FLAG" ] && [ $_n -lt 50 ]; do
-    /bin/sleep 0.1
+    command -p sleep 0.1
     _n=$((_n + 1))
 done
 exit 0
