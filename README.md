@@ -44,3 +44,7 @@ Shell lint (head unit shell has no `printf`, `tail`, `head`, `seq`, `awk`, `grep
 Copy the contents of `dist/hkg-package-manager.zip` (`NEMESIS.data` and `packages/`) to the root of
 a USB stick and plug it into the car. NEMESIS installs it. It needs NEMESIS with its command
 channel running. Then follow the checklist.
+
+## Licence
+
+GPL-3.0 (see `LICENSE`). Credits: `NOTICE.md`.
