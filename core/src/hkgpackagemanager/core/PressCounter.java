@@ -7,6 +7,7 @@ public final class PressCounter {
 
     private final int needed;
     private int count;
+    private boolean hasLast;
     private long last;
 
     public PressCounter(int needed) {
@@ -15,12 +16,13 @@ public final class PressCounter {
 
     /** True when this press completes the required number of presses. */
     public boolean press(long nowMs) {
-        if (count > 0) {
+        if (hasLast) {
             long gap = nowMs - last;
             if (gap < REPEAT_MS) return false;
-            if (gap > WINDOW_MS) count = 0;
+            if (count > 0 && gap > WINDOW_MS) count = 0;
         }
         count++;
+        hasLast = true;
         last = nowMs;
         if (count >= needed) {
             count = 0;

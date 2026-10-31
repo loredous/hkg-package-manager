@@ -22,6 +22,11 @@ public class PressCounterTest {
         assertFalse(c.press(0)); assertFalse(c.press(150)); assertTrue(c.press(400));
     }
 
+    @Test public void duplicateAfterTriggerIgnored() {
+        PressCounter c = new PressCounter(2);
+        assertFalse(c.press(0)); assertTrue(c.press(400)); assertFalse(c.press(405)); assertFalse(c.press(900));
+    }
+
     @Test public void conflictOnlyForNavigation() {
         assertTrue(PressCounter.conflictsWithNemesisManager(Button.NAVIGATION));
         assertFalse(PressCounter.conflictsWithNemesisManager(Button.MEDIA));
