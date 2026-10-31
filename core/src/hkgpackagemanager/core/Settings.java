@@ -1,8 +1,8 @@
 package hkgpackagemanager.core;
 
-/** Which button opens the app and how many presses it takes. */
+/** Which button opens the app and how many presses it takes (presses apply only to a pressed button). */
 public final class Settings {
-    public static final Settings DEFAULT = new Settings(Button.MEDIA, 3);
+    public static final Settings DEFAULT = new Settings(Button.MEDIA_HOLD, 3);
 
     public final Button button;
     public final int presses;
@@ -10,6 +10,11 @@ public final class Settings {
     public Settings(Button button, int presses) {
         this.button = button;
         this.presses = presses;
+    }
+
+    /** Broadcasts needed to open the app: one for a held button, else {@link #presses}. */
+    public int broadcastsNeeded() {
+        return button.hold ? 1 : presses;
     }
 
     @Override public boolean equals(Object o) {

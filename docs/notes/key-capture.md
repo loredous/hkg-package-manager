@@ -1,39 +1,50 @@
 # Key capture: which broadcast each button sends
 
-Status: pending — the owner runs dist/hkg-keycap-kit.zip; values below are provisional.
+Status: done 2026-10-31. There were two runs of `dist/hkg-keycap-kit.zip` on the owner's car,
+with firmware `NEEV23.USA.0000.V015.012.260507`. The raw output stays in `private/KEYCAP*/`
+and is never committed. The full button tables, written for sharing, are in
+[gen5w-hardware-keys.md](gen5w-hardware-keys.md).
 
-Build the kit with `tools/build-kit.sh`, run it on the car (see `kit/README.txt`), then fill
-this note in. Task 8 (the opening button) reads it.
+## What the manager uses
 
-## Provisional values
+| Setting | Broadcast | Opens on |
+|---|---|---|
+| Hold Media (default) | `com.mobis.intent.action.MEDIAGATE_SHORTCUT` | one broadcast, fired about 0.8 s into the hold |
+| Press Navigation | `com.hkmc.intent.action.NAVI_SHORTCUT` | 2-5 short presses (NEMESIS Manager may use it too) |
 
-Media (candidates found in the stock framework; no plain `MEDIA_SHORTCUT` string exists, so
-the key may broadcast a source-specific action; the 200 ms repeat filter absorbs two actions
-from one press):
+The receiver ignores a shortcut broadcast whose `com.hkmc.mode.EXTRA_RESTOREMODE_REASON` isn't
+0. Those broadcasts restore a mode at boot and aren't button presses.
 
-- `com.mobis.intent.action.MEDIAGATE_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_BLUETOOTH_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_MUSIC_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_USB_AUDIO_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_USB_VIDEO_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_AUDIOCD_SHORTCUT`
-- `com.hkmc.intent.action.MEDIA_MCONNECT_SHORTCUT`
+## Why not the other candidates
 
-Navigation: `com.hkmc.intent.action.NAVI_SHORTCUT` (confirmed via NEMESIS Manager).
+- **Media, short press:** it goes to the current media source, so the action changes with
+  state. It sent `com.hkmc.intent.action.GPM_SHORTCUT` (the Android Auto source), with no
+  broadcast receivers. `GPM_SHORTCUT` was also re-sent at boot with
+  `EXTRA_RESTOREMODE_REASON=2`. None of the `MEDIA_*_SHORTCUT` candidates from the
+  framework appeared.
+- **Tune Enter** (the tune paddle pressed in), the owner's first choice: no broadcast for a
+  press, a 3.6 s hold or a triple press. Tune up and down are the same. These keys only go to
+  the foreground view and the media source's own service. NEMESIS Manager listens for
+  `TUNE_ENTER_SHORTCUT` and `_LONG`, but this firmware never sent either one. A background app
+  could only see the key by reading the input device as root, which we chose not to build.
+- **Holding ☆ Custom** (`com.mobis.intent.action.CUSTOM_SHORTCUT`) or NAV
+  (`com.hkmc.intent.action.NAVI_SHORTCUT_LONG`): both work, and they could be added as
+  Settings options later. The owner picked Media.
+- **MAP:** there's no long-press action. A press sends the ordinary `MAP_SHORTCUT` when you
+  let go.
+- **Driver's side dash buttons:** nothing reaches the head unit.
+- **Steering wheel ☆ and the Voice key:** each already has a job (voice memo and voice
+  recognition).
 
-## How to fill this in
+## Press order (as the owner checked it)
 
-Copy the stick's `KEYCAP/` to `private/KEYCAP/` (never commit it). Read:
-
-- `keys.txt`: `ModeKeyDispatcher` / `KEYCODE_*` lines for each press, and the `send key`
-  (MicomD) lines; match them to the press order you wrote down.
-- `broadcasts.txt`: the `act=...` lines for `_SHORTCUT` / `CUSTOM` broadcasts.
-
-Record here, with no private log lines (action strings only):
-
-- the exact action string each pressed button broadcast (Media, Navigation, star/custom,
-  steering-wheel keys);
-- whether each has a `_LONG` variant;
-- your press order.
-
-Then trim the Media candidate list to the actions actually seen.
+- **Run 1:**
+  1. Dash panel: volume knob (turned, then pushed), MAP, NAV, MEDIA, ☆, tune paddle down,
+     tune paddle up, tune paddle pressed in, ☆.
+  2. Steering wheel: volume down, volume up, seek down, seek up, mute, Voice, MODE, ☆, Call,
+     ☆, ☆.
+- **Run 2:**
+  1. Tune Enter: held, then triple-pressed.
+  2. Tune paddle down and tune paddle up: each held, then triple-pressed.
+  3. Holds of ☆, MEDIA, NAV and MAP.
+  4. Driver's side dash buttons, which sent nothing.

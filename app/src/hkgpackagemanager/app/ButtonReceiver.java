@@ -8,8 +8,10 @@ import hkgpackagemanager.core.Button;
 import hkgpackagemanager.core.PressCounter;
 import hkgpackagemanager.core.Settings;
 
-/** Opens the manager after N presses of the chosen car button. */
+/** Opens the manager after a hold, or N presses, of the chosen car button. */
 public class ButtonReceiver extends BroadcastReceiver {
+    /** Non-zero when the framework re-sends a shortcut to restore a mode (at boot), not for a press. */
+    private static final String RESTORE_REASON = "com.hkmc.mode.EXTRA_RESTOREMODE_REASON";
     private static PressCounter counter;
     private static int counterPresses = -1;
     /** When the cache is missing, at most one root read per 30 s (each press would otherwise spawn one). */
@@ -20,6 +22,7 @@ public class ButtonReceiver extends BroadcastReceiver {
         String action = intent == null ? null : intent.getAction();
         final Button pressed = Button.forAction(action);
         if (pressed == null) return;
+        if (intent.getIntExtra(RESTORE_REASON, 0) != 0) return;
         final long now = SystemClock.elapsedRealtime();
         final StateStore store = new StateStore(context, new NemesisCli(context));
         boolean load;
@@ -51,9 +54,10 @@ public class ButtonReceiver extends BroadcastReceiver {
         if (s.button != pressed) return;
         boolean trigger;
         synchronized (ButtonReceiver.class) {
-            if (counter == null || counterPresses != s.presses) {
-                counter = new PressCounter(s.presses);
-                counterPresses = s.presses;
+            int needed = s.broadcastsNeeded();
+            if (counter == null || counterPresses != needed) {
+                counter = new PressCounter(needed);
+                counterPresses = needed;
             }
             trigger = counter.press(now);
         }

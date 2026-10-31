@@ -29,7 +29,7 @@ has 'android.intent.action.MAIN' && has 'android.intent.category.LAUNCHER' && ok
 has 'hkgpackagemanager.app.ButtonReceiver' && ok "ButtonReceiver declared" || bad "ButtonReceiver declared"
 # every string in core Button.allActions(); read from Button.java so the two cannot drift
 ACTIONS=$(sed -n 's/.*"\([a-z]*\.[a-z.]*\.action\.[A-Z_]*\)".*/\1/p' core/src/hkgpackagemanager/core/Button.java | sort -u)
-[ "$(echo "$ACTIONS" | wc -l)" = 8 ] && ok "8 button actions in Button.java" || bad "expected 8 button actions in Button.java"
+[ "$(echo "$ACTIONS" | wc -l)" = 2 ] && ok "2 button actions in Button.java" || bad "expected 2 button actions in Button.java"
 for a in $ACTIONS; do
     has "\"$a\"" && ok "manifest has $a" || bad "manifest has $a"
 done

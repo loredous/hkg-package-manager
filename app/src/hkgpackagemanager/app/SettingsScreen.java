@@ -10,12 +10,12 @@ import hkgpackagemanager.core.Settings;
 import hkgpackagemanager.core.StickLayout;
 import java.util.List;
 
-/** Which car button opens the app, how many presses, and the log copy. */
+/** Which car button opens the app, how many presses (for a pressed button), and the log copy. */
 final class SettingsScreen implements Ui.Screen {
-    private static final String[] BUTTON_LABELS = {"Off", "Navigation", "Media"};
+    private static final String[] BUTTON_LABELS = {"Off", "Press Navigation", "Hold Media"};
     private static final hkgpackagemanager.core.Button[] BUTTONS = {
         hkgpackagemanager.core.Button.OFF, hkgpackagemanager.core.Button.NAVIGATION,
-        hkgpackagemanager.core.Button.MEDIA};
+        hkgpackagemanager.core.Button.MEDIA_HOLD};
 
     private final MainActivity act;
     private final NemesisCli cli;
@@ -24,6 +24,8 @@ final class SettingsScreen implements Ui.Screen {
     private final View view;
     private final Button[] buttonChoices = new Button[BUTTONS.length];
     private final Button[] pressChoices = new Button[4]; // 2..5
+    private final TextView pressesLabel;
+    private final LinearLayout pressesRow;
     private final TextView conflict;
     private final TextView logResult;
     private Settings settings = Settings.DEFAULT;
@@ -44,16 +46,17 @@ final class SettingsScreen implements Ui.Screen {
             buttons.addView(buttonChoices[i]);
         }
         content.addView(buttons);
-        content.addView(Ui.bold(a, "Presses needed"));
-        LinearLayout presses = Ui.row(a);
+        pressesLabel = Ui.bold(a, "Presses needed");
+        content.addView(pressesLabel);
+        pressesRow = Ui.row(a);
         for (int i = 0; i < pressChoices.length; i++) {
             final int n = i + 2;
             pressChoices[i] = Ui.button(a, String.valueOf(n), new View.OnClickListener() {
                 public void onClick(View v) { change(new Settings(settings.button, n)); }
             });
-            presses.addView(pressChoices[i]);
+            pressesRow.addView(pressChoices[i]);
         }
-        content.addView(presses);
+        content.addView(pressesRow);
         conflict = Ui.text(a, ScreenText.CONFLICT_LINE);
         content.addView(conflict);
         content.addView(Ui.button(a, "Copy log to USB drive", new View.OnClickListener() {
@@ -93,6 +96,11 @@ final class SettingsScreen implements Ui.Screen {
     private void show() {
         for (int i = 0; i < BUTTONS.length; i++) buttonChoices[i].setEnabled(BUTTONS[i] != settings.button);
         for (int i = 0; i < pressChoices.length; i++) pressChoices[i].setEnabled(i + 2 != settings.presses);
+        // a held button opens on one hold; Off has nothing to count
+        int pressVisibility = settings.button.hold || settings.button == hkgpackagemanager.core.Button.OFF
+            ? View.GONE : View.VISIBLE;
+        pressesLabel.setVisibility(pressVisibility);
+        pressesRow.setVisibility(pressVisibility);
         conflict.setVisibility(PressCounter.conflictsWithNemesisManager(settings.button) ? View.VISIBLE : View.GONE);
     }
 

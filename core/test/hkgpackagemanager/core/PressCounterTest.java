@@ -27,9 +27,14 @@ public class PressCounterTest {
         assertFalse(c.press(0)); assertTrue(c.press(400)); assertFalse(c.press(405)); assertFalse(c.press(900));
     }
 
+    @Test public void oneNeededTriggersOnEachHoldButNotItsDuplicate() {
+        PressCounter c = new PressCounter(1);
+        assertTrue(c.press(0)); assertFalse(c.press(50)); assertTrue(c.press(3000));
+    }
+
     @Test public void conflictOnlyForNavigation() {
         assertTrue(PressCounter.conflictsWithNemesisManager(Button.NAVIGATION));
-        assertFalse(PressCounter.conflictsWithNemesisManager(Button.MEDIA));
+        assertFalse(PressCounter.conflictsWithNemesisManager(Button.MEDIA_HOLD));
         assertFalse(PressCounter.conflictsWithNemesisManager(Button.OFF));
     }
 }

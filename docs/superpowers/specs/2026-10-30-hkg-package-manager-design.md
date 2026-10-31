@@ -173,19 +173,25 @@ the queue results are on the stick.
 
 ### Opening the manager
 
-- **Configurable button press** *(owner)*: in Settings the user picks the button and the
-  number of presses. The manager counts presses the way NEMESIS Manager does (1.5 s window,
-  200 ms repeat filter).
-- Default: the **Media** key *(owner)*, three presses. Press count 2-5 *(my calls)*.
-  The owner's car logged the key itself: `KEYCODE_SHORTCUT_MEDIA`, scanCode 19, through
-  `ModeKeyDispatcher`, in the Leafia kit log. The framework names an
-  `ACTION_SHORTCUT_MEDIA` broadcast (and `_LONG`), but its exact action string, and whether
-  an app receives it, aren't confirmed yet. The key-capture kit (see "To-do") confirms
-  them. If Media gives no broadcast an app can receive, the default falls back to
-  Navigation *(my call)*.
-- Buttons offered: those whose broadcast an app is confirmed to receive. That's Navigation
-  (`com.hkmc.intent.action.NAVI_SHORTCUT`, used by NEMESIS Manager) and Media once
-  confirmed, plus Off. The framework also knows Setup, the custom (often ☆) key on the
+- **Configurable button** *(owner)*: in Settings the user picks the button and, for a
+  pressed button, the number of presses. The manager counts presses the way NEMESIS
+  Manager does (1.5 s window, 200 ms repeat filter).
+- Default: **hold Media** *(owner, 2026-10-31, after the key capture)*. Holding Media
+  sends `com.mobis.intent.action.MEDIAGATE_SHORTCUT` about 0.8 s into the hold, so one
+  broadcast opens the manager. The key capture showed:
+  - **A short Media press isn't usable.** It sends the current media source's mode
+    shortcut, which depends on state (`GPM_SHORTCUT` with Android Auto connected). The same
+    action is also re-sent at boot to restore the mode.
+  - **Tune Enter, the owner's first choice, sends no broadcast at all.** That was true for a
+    press, a hold and a triple press alike.
+
+  The receiver also ignores any shortcut broadcast whose
+  `com.hkmc.mode.EXTRA_RESTOREMODE_REASON` isn't 0 *(my call)*. Press count is 2-5 for a
+  pressed button *(my call)*. Findings: `docs/notes/key-capture.md` and
+  `docs/notes/gen5w-hardware-keys.md`.
+- Buttons offered: those whose broadcast an app is confirmed to receive. That's Off, press
+  Navigation (`com.hkmc.intent.action.NAVI_SHORTCUT`, which NEMESIS Manager may also use)
+  and hold Media. The framework also knows Setup, the custom (often ☆) key on the
   head unit and on the steering wheel (`com.mobis.intent.action.CUSTOM_SHORTCUT`,
   `SWRC_CUSTOM_SHORTCUT`), voice/PTT, Phone, Mode, Map, Display, Radio and Apps (many with
   `_LONG` versions). Some of these may not exist on a given model. Each is added only
@@ -509,7 +515,8 @@ decisions:
 
 ## To-do
 
-1. **Read-only key-capture kit** *(owner, 2026-10-30)*. This comes first in Phase 1,
+1. **Read-only key-capture kit** *(owner, 2026-10-30)*. **Done 2026-10-31:** two runs, and
+   the default is now hold Media (see "Opening the manager"). This came first in Phase 1,
    because the opening button depends on it.
    - **How it works:** a `type=execute` stick in the style of the hkg-climate kit (mksh-safe,
      changes nothing on the car). The owner presses each candidate button (Media, Navigation,
@@ -543,7 +550,7 @@ decisions:
   restart. The manager checks for an unfinished list on start and on insert.
 - Failed packages are skipped; a final status report is shown at the end.
 - Phase 1 also lists installed packages with versions, uninstalls, and updates.
-- Opened by a configurable button press; default the Media key (three presses).
+- Opened by a configurable car button; default hold Media (set after the key capture).
 - To-do: a read-only key-capture kit to confirm which buttons can open the manager.
 - Catalog: static page + JSON, hostable from a GitHub repo; a community catalog may grow
   by merge requests; the format is fully open so anyone can run their own.

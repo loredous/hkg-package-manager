@@ -3,11 +3,11 @@
 A NEMESIS package manager for Hyundai/Kia Gen5W head units. It installs and uninstalls
 NEMESIS packages from a USB stick, with an on-screen app to drive it (a drive tab, an
 installed tab, a progress screen and settings), a queue that survives head unit restarts, and
-a car button (Media or Navigation, pressed three times) that opens it.
+a car button that opens it (hold Media by default, or press Navigation a set number of times).
 
-**Status: Phase 1 built, not yet tried on the car.** The Media button default uses provisional
-broadcast names until the key-capture kit has run; the manager always opens from NEMESIS
-Manager > Packages > HKG Package Manager > Launch.
+**Status: Phase 1 built, not yet tried on the car.** The opening button comes from the
+owner's key capture ([docs/notes/key-capture.md](docs/notes/key-capture.md)). The manager can
+also always be opened from NEMESIS Manager > Packages > HKG Package Manager > Launch.
 
 - Design: [docs/superpowers/specs/2026-10-30-hkg-package-manager-design.md](docs/superpowers/specs/2026-10-30-hkg-package-manager-design.md)
 - Plan: [docs/superpowers/plans/2026-10-30-phase-1-package-manager.md](docs/superpowers/plans/2026-10-30-phase-1-package-manager.md)

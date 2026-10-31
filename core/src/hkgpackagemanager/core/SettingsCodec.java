@@ -1,6 +1,6 @@
 package hkgpackagemanager.core;
 
-/** Text form of {@link Settings}: {@code button=media\npresses=3\n}. Decoding never throws. */
+/** Text form of {@link Settings}: {@code button=media_hold\npresses=3\n}. Decoding never throws. */
 public final class SettingsCodec {
     private static final int MIN_PRESSES = 2;
     private static final int MAX_PRESSES = 5;
