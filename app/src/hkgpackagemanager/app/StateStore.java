@@ -66,6 +66,9 @@ public final class StateStore {
         }
     }
 
+    /** False after a NEMESIS update wiped filesDir (it uninstalls without -k) until load() refreshes it. */
+    public boolean hasCache() { return cache.isFile(); }
+
     /** The cache only; never touches the CLI. */
     public Settings cached() {
         if (!cache.isFile()) return Settings.DEFAULT;
