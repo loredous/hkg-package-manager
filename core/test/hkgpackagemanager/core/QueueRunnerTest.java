@@ -89,6 +89,23 @@ public class QueueRunnerTest {
         assertEquals(Messages.MSG_INTERRUPTED, runner().resolveInterrupted(q(hung)).items.get(0).message);
     }
 
+    @Test public void interruptedWithoutVersionOnEitherSideIsDone() {
+        nem.setInstalled("a.a", null);
+        QueueItem hung = w("a.zip", "a.a", "").withState(ItemState.INSTALLING, "");
+        assertEquals(ItemState.DONE, runner().resolveInterrupted(q(hung)).items.get(0).state);
+    }
+
+    @Test public void saveFailureWithoutMessageNeverSaysNull() {
+        QueueStore failing = new QueueStore() {
+            public void save(Queue q) throws IOException { throw new IOException(); }
+        };
+        QueueRunner.Outcome o = new QueueRunner(new InstallStep(nem, "/s"), failing, check, new QueueRunner.Listener() {
+            public void changed(Queue q) { }
+        }).run(q(w("a.zip", "a.a", "1")));
+        assertTrue(o.stopped);
+        assertEquals("java.io.IOException", o.stopReason);
+    }
+
     @Test public void changedZipIsNotInstalled() {
         QueueRunner.Outcome o = runner().run(q(w("chg.zip", "a.a", "1")));
         assertEquals(Messages.MSG_CHANGED, o.queue.items.get(0).message);

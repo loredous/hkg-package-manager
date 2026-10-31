@@ -12,7 +12,8 @@ import java.util.TreeMap;
  * <ul>
  * <li>{@link #calls()} records every call as an argv-style list, built with {@link NemesisCalls}
  *     (e.g. ["install","--update","/x.zip"], ["uninstall","id"], ["pkg-list"], ["root","-c",cmd]).</li>
- * <li>Installed state is a map id -> version: {@link #setInstalled}, {@link #removeInstalled}.
+ * <li>Installed state is a map id -> version (null: its NEMESIS.data has no version key):
+ *     {@link #setInstalled}, {@link #removeInstalled}.
  *     {@link #pkgList()} renders installed ids (sorted) as {@code id|id|0|} lines, exit 0.</li>
  * <li>{@link #uninstall(String)} removes the id and answers exit 0 "ok removed id" if it was installed,
  *     else exit 1 "not installed".</li>
@@ -88,7 +89,8 @@ public final class FakeNemesis implements Nemesis {
         calls.add(NemesisCalls.root(cmd));
         for (Map.Entry<String, String> e : installed.entrySet()) {
             if (cmd.equals(NemesisCalls.catCommand(NemesisCalls.installedMetaPath(e.getKey())))) {
-                return new CliResult(0, "[nemesis]\nid=" + e.getKey() + "\nversion=" + e.getValue() + "\n");
+                String v = e.getValue() == null ? "" : "version=" + e.getValue() + "\n"; // null: no version key
+                return new CliResult(0, "[nemesis]\nid=" + e.getKey() + "\n" + v);
             }
         }
         if (cmd.startsWith("cat '/data/nemesis/apps/")) return new CliResult(1, "");

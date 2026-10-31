@@ -11,6 +11,7 @@ public final class MemStickFiles implements StickFiles {
     private static final Charset UTF8 = Charset.forName("UTF-8");
     private final Map<String, byte[]> files = new HashMap<String, byte[]>();
     private int writesLeft = -1;
+    private String failure = "stick removed";
 
     public void put(String rel, String text) { files.put(rel, text.getBytes(UTF8)); }
 
@@ -20,10 +21,16 @@ public final class MemStickFiles implements StickFiles {
     }
 
     /** After n more successful writes, every write-type call throws. */
-    public void failWritesAfter(int n) { writesLeft = n; }
+    public void failWritesAfter(int n) { failWritesAfter(n, "stick removed"); }
+
+    /** As above with the given IOException message (StickFs says "USB drive not mounted"); n = -1 heals. */
+    public void failWritesAfter(int n, String message) {
+        writesLeft = n;
+        failure = message;
+    }
 
     private void write() throws IOException {
-        if (writesLeft == 0) throw new IOException("stick removed");
+        if (writesLeft == 0) throw new IOException(failure);
         if (writesLeft > 0) writesLeft--;
     }
 

@@ -18,7 +18,12 @@ public final class Messages {
         return "install failed: " + (last != null ? last : "exit " + r.exit);
     }
 
+    /** `installed version is <got>, expected <want>`; a missing or empty version reads "unknown", never "null". */
     public static String versionMismatch(String got, String want) {
-        return "installed version is " + got + ", expected " + want;
+        return "installed version is " + shown(got) + ", expected " + shown(want);
+    }
+
+    private static String shown(String version) {
+        return version == null || version.trim().length() == 0 ? "unknown" : version.trim();
     }
 }

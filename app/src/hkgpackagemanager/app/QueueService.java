@@ -57,19 +57,23 @@ public class QueueService extends Service {
             }
             return START_NOT_STICKY;
         }
+        final Queue prevQueue;
+        final QueueRunner.Outcome prevOutcome;
         synchronized (LOCK) {
             lastStartId = startId;
             if (!RUNNING.compareAndSet(false, true)) {
                 log.log("ignored " + action + ": a queue is already running");
                 return START_NOT_STICKY;
             }
+            prevQueue = current;
+            prevOutcome = lastOutcome;
             current = null;
             lastOutcome = null;
         }
         startForeground(NOTIFICATION_ID, notification());
         final Context app = getApplicationContext();
         Thread t = new Thread(new Runnable() {
-            public void run() { work(app, intent); }
+            public void run() { work(app, intent, prevQueue, prevOutcome); }
         }, "hkgpm-queue");
         t.start();
         return START_NOT_STICKY;
@@ -84,11 +88,16 @@ public class QueueService extends Service {
                 .build();
     }
 
-    private void work(Context app, Intent intent) {
+    private void work(Context app, Intent intent, Queue prevQueue, QueueRunner.Outcome prevOutcome) {
         AppLog log = AppLog.get(app);
         boolean show = false;
         try {
             show = dispatch(app, intent, log);
+            if (!show && current == null && lastOutcome == null) {
+                // nothing ran (e.g. a resume that only tidied a leftover descriptor): keep the last report
+                current = prevQueue;
+                lastOutcome = prevOutcome;
+            }
         } catch (Exception e) {
             log.log("queue worker failed: " + e);
             Queue q = current;
@@ -125,21 +134,18 @@ public class QueueService extends Service {
         String action = intent.getAction();
         NemesisCli cli = new NemesisCli(app);
         if (ACTION_POSTINSTALL.equals(action)) {
-            for (String root : Sticks.mounted()) {
-                QueueSession s = session(app, cli, root);
-                Queue q;
-                try {
-                    q = s.loadUnfinished();
-                } catch (QueueCodec.Unreadable e) {
-                    log.log("unreadable install list on " + root + ": " + e.getMessage());
-                    continue;
-                }
-                if (q != null) return runOutcome(s.resume());
+            // a NEMESIS update uninstalls first (pm uninstall without -k), which wipes the settings cache in
+            // filesDir; refresh it from the state folder so the car button keeps its setting
+            try {
+                new StateStore(app, cli).load();
+            } catch (RuntimeException e) {
+                log.log("cannot refresh settings: " + e);
             }
-            return false;
+            return sweep(app, cli, log);
         }
         String root = intent.getStringExtra(EXTRA_ROOT);
         if (root == null) {
+            if (ACTION_RESUME.equals(action)) return sweep(app, cli, log);
             log.log("ignored " + action + ": no stick root");
             return false;
         }
@@ -158,21 +164,60 @@ public class QueueService extends Service {
             return runOutcome(s.start(items));
         }
         if (ACTION_RESUME.equals(action)) {
+            Queue q;
             try {
-                s.loadUnfinished();
+                q = s.loadUnfinished();
             } catch (QueueCodec.Unreadable e) {
                 log.log("unreadable install list on " + root + ": " + e.getMessage());
+                return false;
+            }
+            if (q == null) {
+                tidy(s, root, log);
                 return false;
             }
             return runOutcome(s.resume());
         }
         if (ACTION_DISCARD.equals(action)) {
-            s.discard();
+            if (s.discard()) {
+                // keep the R20 note for the Progress screen: NEMESIS may now ask about the restored descriptor
+                Queue q = current;
+                lastOutcome = new QueueRunner.Outcome(q != null ? q : new Queue(false, new ArrayList<QueueItem>()),
+                        false, null, true);
+            }
             broadcastChanged(app);
             return false;
         }
         log.log("ignored unknown action " + action);
         return false;
+    }
+
+    /**
+     * Every mounted stick: continues the first unfinished queue found; on sticks without one, removes a
+     * leftover resume descriptor (Ruling R11). Returns true when a run happened.
+     */
+    private boolean sweep(Context app, NemesisCli cli, AppLog log) throws IOException {
+        for (String root : Sticks.mounted()) {
+            QueueSession s = session(app, cli, root);
+            Queue q;
+            try {
+                q = s.loadUnfinished();
+            } catch (QueueCodec.Unreadable e) {
+                log.log("unreadable install list on " + root + ": " + e.getMessage());
+                continue;
+            }
+            if (q != null) return runOutcome(s.resume());
+            tidy(s, root, log);
+        }
+        return false;
+    }
+
+    /** No unfinished queue on this stick: resume() then only removes our leftover descriptor, if any. */
+    private static void tidy(QueueSession s, String root, AppLog log) {
+        try {
+            if (s.resume() != null) log.log("unexpected run while tidying " + root);
+        } catch (IOException e) {
+            log.log("cannot remove the leftover resume descriptor on " + root + ": " + e.getMessage());
+        }
     }
 
     private boolean runOutcome(QueueRunner.Outcome o) {

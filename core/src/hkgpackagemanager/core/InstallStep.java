@@ -1,6 +1,5 @@
 package hkgpackagemanager.core;
 
-import java.nio.charset.Charset;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -27,7 +26,7 @@ public final class InstallStep {
             }
             String got = installedVersion(item.id);
             String want = item.version == null ? "" : item.version.trim();
-            if (got != null && got.trim().equals(want)) return item.withState(ItemState.DONE, "");
+            if (want.equals(got)) return item.withState(ItemState.DONE, ""); // "" == "": neither has a version
             return item.withState(ItemState.FAILED, Messages.versionMismatch(got, want));
         }
         if (item.update && !installedIds().contains(item.id)) {
@@ -36,13 +35,16 @@ public final class InstallStep {
         return item.withState(ItemState.FAILED, Messages.installFailed(r));
     }
 
-    /** The installed version from the package's NEMESIS.data, or null if unreadable. */
+    /**
+     * The installed version from the package's NEMESIS.data (trimmed), "" when it has no version key,
+     * or null when it can't be read.
+     */
     public String installedVersion(String id) {
         if (!PackageId.isValid(id)) return null;
         CliResult r = nemesis.root(NemesisCalls.catCommand(NemesisCalls.installedMetaPath(id)));
         if (r.exit != 0) return null;
         String v = IniFile.parse(r.output).get("nemesis", "version");
-        return v == null ? null : v.trim();
+        return v == null ? "" : v.trim();
     }
 
     public Set<String> installedIds() {

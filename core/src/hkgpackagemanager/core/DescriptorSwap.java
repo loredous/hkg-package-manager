@@ -16,15 +16,32 @@ public final class DescriptorSwap {
         s.writeAtomic(StickLayout.DESCRIPTOR, StickLayout.resumeDescriptor());
     }
 
-    public static void end(StickFiles s) throws IOException {
+    /**
+     * Removes our descriptor and puts back the stick's original one. Returns true when an original
+     * was put back: NEMESIS's handler then sees a new descriptor and may ask about it right away.
+     * HKGPM/resume.sh stays on the stick (Ruling R21): a late Yes to NEMESIS's question about our
+     * descriptor then runs it harmlessly instead of NEMESIS reporting a missing script.
+     */
+    public static boolean end(StickFiles s) throws IOException {
         if (s.exists(StickLayout.DESCRIPTOR) && isOurs(s.read(StickLayout.DESCRIPTOR))) {
             s.delete(StickLayout.DESCRIPTOR);
         }
         // a foreign NEMESIS.data (the user replaced ours) stays, and so does SAVED
         if (s.exists(StickLayout.SAVED) && !s.exists(StickLayout.DESCRIPTOR)) {
             s.move(StickLayout.SAVED, StickLayout.DESCRIPTOR);
+            return true;
         }
-        if (s.exists(StickLayout.RESUME)) s.delete(StickLayout.RESUME);
+        return false;
+    }
+
+    /** True when the stick's root NEMESIS.data is our resume descriptor (unreadable counts as not ours). */
+    public static boolean hasOurs(StickFiles s) {
+        if (!s.exists(StickLayout.DESCRIPTOR)) return false;
+        try {
+            return isOurs(s.read(StickLayout.DESCRIPTOR));
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public static boolean isOurs(byte[] descriptor) {

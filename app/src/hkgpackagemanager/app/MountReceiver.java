@@ -3,10 +3,14 @@ package hkgpackagemanager.app;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import hkgpackagemanager.core.DescriptorSwap;
 import hkgpackagemanager.core.QueueCodec;
 import hkgpackagemanager.core.QueueSession;
 
-/** A stick was mounted: when it holds an unfinished queue and nothing is running, ask about it. */
+/**
+ * A stick was mounted: when it holds an unfinished queue and nothing is running, ask about it; when
+ * it only holds our leftover resume descriptor, have the service remove it.
+ */
 public class MountReceiver extends BroadcastReceiver {
     @Override public void onReceive(final Context context, Intent intent) {
         if (intent == null || intent.getData() == null) return;
@@ -39,7 +43,17 @@ public class MountReceiver extends BroadcastReceiver {
             log.log("unreadable install list on " + path + ": " + e.getMessage());
             unfinished = true; // the screen explains it and offers to discard
         }
-        if (!unfinished || QueueService.isRunning()) return;
+        if (QueueService.isRunning()) return;
+        if (!unfinished) {
+            // our descriptor without an unfinished queue (an earlier clean-up failed): let the service
+            // remove it (Ruling R11), or NEMESIS keeps asking about it
+            if (DescriptorSwap.hasOurs(stick)) {
+                log.log("leftover resume descriptor on " + path + "; removing it");
+                context.startService(new Intent(context, QueueService.class)
+                        .setAction(QueueService.ACTION_RESUME).putExtra(QueueService.EXTRA_ROOT, path));
+            }
+            return;
+        }
         Intent open = new Intent(context, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         open.putExtra(MainActivity.EXTRA_ROOT, path);

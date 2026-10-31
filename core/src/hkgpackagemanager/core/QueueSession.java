@@ -65,9 +65,8 @@ public final class QueueSession {
             throw new IOException("unreadable install list: " + e.getMessage());
         }
         if (q == null) {
-            if (stick.exists(StickLayout.DESCRIPTOR) && DescriptorSwap.isOurs(stick.read(StickLayout.DESCRIPTOR))) {
-                DescriptorSwap.end(stick);
-            }
+            // Ruling R11: a leftover resume descriptor (an earlier end() failed) would make NEMESIS ask on every boot
+            if (DescriptorSwap.hasOurs(stick)) DescriptorSwap.end(stick);
             return null;
         }
         q = runner.resolveInterrupted(q);
@@ -89,7 +88,8 @@ public final class QueueSession {
         return q.finished ? null : q;
     }
 
-    public void discard() throws IOException {
+    /** Ends the unfinished queue without installing more. Returns true when the stick's original NEMESIS.data was put back. */
+    public boolean discard() throws IOException {
         Queue q = null;
         try {
             q = loadUnfinished();
@@ -110,11 +110,11 @@ public final class QueueSession {
             store.save(q);
             listener.changed(q);
         }
-        DescriptorSwap.end(stick);
+        return DescriptorSwap.end(stick);
     }
 
     private QueueRunner.Outcome finish(QueueRunner.Outcome o) throws IOException {
-        if (!o.stopped) DescriptorSwap.end(stick);
-        return o;
+        if (o.stopped) return o; // the stick keeps our descriptor so the queue can continue later
+        return o.withRestoredDescriptor(DescriptorSwap.end(stick));
     }
 }

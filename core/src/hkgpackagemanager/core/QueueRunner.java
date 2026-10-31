@@ -2,6 +2,7 @@ package hkgpackagemanager.core;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /** Walks the queue in order, saving every state change before moving on. */
 public final class QueueRunner {
@@ -13,11 +14,22 @@ public final class QueueRunner {
         public final Queue queue;
         public final boolean stopped;
         public final String stopReason;
+        /** The run ended and the stick's original NEMESIS.data was put back (NEMESIS may now ask about it). */
+        public final boolean restoredDescriptor;
 
         public Outcome(Queue queue, boolean stopped, String stopReason) {
+            this(queue, stopped, stopReason, false);
+        }
+
+        public Outcome(Queue queue, boolean stopped, String stopReason, boolean restoredDescriptor) {
             this.queue = queue;
             this.stopped = stopped;
             this.stopReason = stopReason;
+            this.restoredDescriptor = restoredDescriptor;
+        }
+
+        public Outcome withRestoredDescriptor(boolean restored) {
+            return new Outcome(queue, stopped, stopReason, restored);
         }
     }
 
@@ -57,13 +69,13 @@ public final class QueueRunner {
     /** Settles items left INSTALLING by a restart: DONE if installed at the right version, else FAILED. Never retries. */
     public Queue resolveInterrupted(Queue q) {
         List<QueueItem> items = q.items;
-        java.util.Set<String> ids = null;
+        Set<String> ids = null;
         for (int i = 0; i < items.size(); i++) {
             QueueItem item = items.get(i);
             if (item.state != ItemState.INSTALLING) continue;
             if (ids == null) ids = step.installedIds();
-            boolean ok = ids.contains(item.id) && item.version != null
-                    && item.version.trim().equals(step.installedVersion(item.id));
+            String want = item.version == null ? "" : item.version.trim();
+            boolean ok = ids.contains(item.id) && want.equals(step.installedVersion(item.id));
             q = q.withItem(i, ok ? item.withState(ItemState.DONE, "")
                     : item.withState(ItemState.FAILED, Messages.MSG_INTERRUPTED));
         }
@@ -86,7 +98,7 @@ public final class QueueRunner {
         try {
             store.save(q);
         } catch (IOException e) {
-            throw new StopRun(String.valueOf(e.getMessage()), q);
+            throw new StopRun(e.getMessage() != null ? e.getMessage() : e.toString(), q);
         }
         listener.changed(q);
         return q;

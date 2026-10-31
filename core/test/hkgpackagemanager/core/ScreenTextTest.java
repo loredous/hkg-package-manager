@@ -26,6 +26,8 @@ public class ScreenTextTest {
         assertEquals("Same version", ScreenText.statusText(zip("a.b", "2"), installed("a.b", "2")));
         assertEquals("Update (installed 1, drive 2)", ScreenText.statusText(zip("a.b", "2"), installed("a.b", "1")));
         assertEquals("Update (installed unknown, drive 2)", ScreenText.statusText(zip("a.b", "2"), installed("a.b", null)));
+        assertEquals("Same version", ScreenText.statusText(zip("a.b", ""), installed("a.b", "")));
+        assertEquals("Update (installed 1, drive unknown)", ScreenText.statusText(zip("a.b", ""), installed("a.b", "1")));
         assertEquals("not a readable zip", ScreenText.statusText(StickZip.problem("x.zip", 1, "not a readable zip"), none));
     }
 
@@ -52,6 +54,25 @@ public class ScreenTextTest {
         assertEquals("/storage/usb0", ScreenText.chooseStick(Arrays.asList("/storage/usb0"), null));
         assertEquals(Arrays.asList("/storage/usb1", "/storage/usb0"),
                 ScreenText.preferredFirst(Arrays.asList("/storage/usb0", "/storage/usb1"), "/storage/usb1"));
+    }
+
+    @Test public void descriptorNotes() {
+        assertEquals("If NEMESIS asks to run an item from the USB drive, either answer is fine.",
+                ScreenText.descriptorNote(true, false));
+        assertEquals(ScreenText.HANDLER_NOTE, ScreenText.descriptorNote(true, true));
+        assertEquals("NEMESIS may now ask about the drive's own NEMESIS.data. Answer as you would when inserting the drive.",
+                ScreenText.descriptorNote(false, true));
+        assertNull(ScreenText.descriptorNote(false, false));
+    }
+
+    @Test public void singleConfirmWarnsOnSelfUpdate() throws Exception {
+        assertEquals("Update test.a 1.1?", ScreenText.singleConfirm("Update", zip("test.a", "1.1").meta));
+        assertEquals("Install Test A?", ScreenText.singleConfirm("Install",
+                StickZip.ok("a.zip", 1, PackageMeta.from(IniFile.parse("[nemesis]\nid=test.a\nname=Test A\n"))).meta));
+        assertEquals("Update HKG Package Manager 1.0.1?\n\nThe manager will close while it updates; open it again afterwards.",
+                ScreenText.singleConfirm("Update", StickZip.ok("m.zip", 1, PackageMeta.from(IniFile.parse(
+                        "[nemesis]\nid=hkg.package.manager\nname=HKG Package Manager\nversion=1.0.1\n"))).meta));
+        assertEquals("An install is running.", ScreenText.RUNNING_INFO);
     }
 
     @Test public void keepDriveNote() {

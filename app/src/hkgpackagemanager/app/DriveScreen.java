@@ -189,7 +189,7 @@ final class DriveScreen implements Ui.Screen {
     private void confirmSingle(final StickZip z, final ZipStatus status) {
         if (refuseWhileRunning()) return;
         final String root = stick;
-        Ui.confirm(act, null, ScreenText.actionLabel(status) + " " + z.meta.name + " " + z.meta.version + "?",
+        Ui.confirm(act, null, ScreenText.singleConfirm(ScreenText.actionLabel(status), z.meta),
                 ScreenText.actionLabel(status), new Runnable() {
                     public void run() { single(root, z, status != ZipStatus.NEW); }
                 }, "Cancel", null);

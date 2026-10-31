@@ -85,6 +85,29 @@ public class InstallStepTest {
         assertTrue(ids.contains("c.d"));
     }
 
+    @Test public void installedVersionWithoutVersionKeyIsEmpty() {
+        nem.setInstalled("a.b", null);
+        assertEquals("", step.installedVersion("a.b"));
+        assertNull(step.installedVersion("z.z")); // cat fails
+    }
+
+    @Test public void packageWithoutVersionMatchesInstalledWithoutVersion() {
+        nem.scriptInstallSuccess("/storage/usb0/p/a.zip", "a.b", null);
+        assertEquals(ItemState.DONE, step.perform(item("p/a.zip", "a.b", "", false)).state);
+        nem.scriptInstallSuccess("/storage/usb0/p/b.zip", "b.b", null);
+        assertEquals(ItemState.DONE, step.perform(item("p/b.zip", "b.b", null, false)).state);
+    }
+
+    @Test public void mismatchNeverSaysNull() {
+        nem.scriptInstallSuccess("/storage/usb0/p/a.zip", "a.b", null);
+        assertEquals("installed version is unknown, expected 1.0",
+                step.perform(item("p/a.zip", "a.b", "1.0", false)).message);
+        nem.scriptInstallSuccess("/storage/usb0/p/b.zip", "b.b", "2.0");
+        assertEquals("installed version is 2.0, expected unknown",
+                step.perform(item("p/b.zip", "b.b", "", false)).message);
+        assertEquals("installed version is unknown, expected 1.0", Messages.versionMismatch(null, "1.0"));
+    }
+
     @Test public void exitZeroButNotListed() {
         nem.scriptInstall("/storage/usb0/p/a.zip", 0, "ok installed a.b");
         QueueItem r = step.perform(item("p/a.zip", "a.b", "1.0", false));

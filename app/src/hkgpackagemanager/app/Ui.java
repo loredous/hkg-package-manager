@@ -117,18 +117,18 @@ final class Ui {
         return s;
     }
 
-    static void info(Activity a, String title, String message) {
-        confirm(a, title, message, "OK", null, null, null);
+    static AlertDialog info(Activity a, String title, String message) {
+        return confirm(a, title, message, "OK", null, null, null);
     }
 
     /** A dialog with big text. {@code no} may be null for a single-button dialog; cancelling does nothing unless {@code onCancel} is given. */
-    static void confirm(Activity a, String title, String message, String yes, Runnable onYes,
+    static AlertDialog confirm(Activity a, String title, String message, String yes, Runnable onYes,
             String no, Runnable onNo) {
-        confirm(a, title, message, yes, onYes, no, onNo, null);
+        return confirm(a, title, message, yes, onYes, no, onNo, null);
     }
 
     /** As above; Back or a tap outside runs only {@code onCancel} (never {@code onNo}, so cancelling can't discard). */
-    static void confirm(Activity a, String title, String message, String yes, final Runnable onYes,
+    static AlertDialog confirm(Activity a, String title, String message, String yes, final Runnable onYes,
             String no, final Runnable onNo, final Runnable onCancel) {
         AlertDialog.Builder b = new AlertDialog.Builder(a);
         if (title != null) b.setTitle(title);
@@ -153,6 +153,7 @@ final class Ui {
                 btn.setMinHeight(dp(a, TARGET_DP));
             }
         }
+        return d;
     }
 
     /** A dialog with no buttons, to dismiss when the work is done. */

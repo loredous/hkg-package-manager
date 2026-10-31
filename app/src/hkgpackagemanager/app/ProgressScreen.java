@@ -24,16 +24,19 @@ final class ProgressScreen implements Ui.Screen {
 
     @Override public void refresh() {
         content.removeAllViews();
-        content.addView(Ui.text(ctx, ScreenText.HANDLER_NOTE));
-        if (QueueService.isRunning()) content.addView(Ui.bold(ctx, ScreenText.KEEP_DRIVE));
+        boolean running = QueueService.isRunning();
         Queue q = QueueService.current();
         QueueRunner.Outcome o = QueueService.lastOutcome();
+        // the handler note only while a run swaps descriptors; afterwards, the R20 note if one was put back
+        String note = ScreenText.descriptorNote(running, o != null && o.restoredDescriptor);
+        if (note != null) content.addView(Ui.text(ctx, note));
+        if (running) content.addView(Ui.bold(ctx, ScreenText.KEEP_DRIVE));
         if (q == null && o != null) q = o.queue;
         if (q == null) {
-            content.addView(Ui.text(ctx, QueueService.isRunning() ? "Starting…" : "No install has run yet."));
+            content.addView(Ui.text(ctx, running ? "Starting…" : "No install has run yet."));
             return;
         }
-        boolean over = !QueueService.isRunning();
+        boolean over = !running;
         for (QueueItem i : q.items) {
             // once finished the failures are listed below with their reasons
             QueueItem shown = over && q.finished ? i.withState(i.state, "") : i;

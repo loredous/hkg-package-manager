@@ -49,8 +49,49 @@ public class QueueSessionTest {
         assertEquals(5, o.queue.items.get(0).size);
         assertEquals("sha-a.zip", o.queue.items.get(0).sha256);
         assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
-        assertFalse(stick.exists("HKGPM/resume.sh"));
+        assertTrue(o.restoredDescriptor);
+        assertTrue(stick.exists("HKGPM/resume.sh")); // kept for a late Yes (R21)
         assertNull(session().loadUnfinished());
+    }
+
+    @Test public void startWithoutOriginalDescriptorRestoresNothing() throws Exception {
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        QueueRunner.Outcome o = session().start(Arrays.asList(sel("a.zip", "a.a", "1")));
+        assertTrue(o.queue.finished);
+        assertFalse(o.restoredDescriptor);
+        assertFalse(stick.exists("NEMESIS.data"));
+    }
+
+    @Test public void stickUnmountedMidQueueStopsAndResumesLater() throws Exception {
+        stick.put("NEMESIS.data", "[nemesis]\nid=stick\n");
+        nem.scriptInstallSuccess("/s/a.zip", "a.a", "1");
+        nem.scriptInstall("/s/b.zip", 1, "unzip: cannot find /s/b.zip");
+        nem.scriptInstallSuccess("/s/c.zip", "c.c", "1");
+        // writes: save original, resume.sh, our descriptor, queue, a installing, a done, b installing;
+        // the stick is pulled during b's install, so saving b's result is refused (StickFs: not mounted)
+        stick.failWritesAfter(7, "USB drive not mounted");
+        QueueRunner.Outcome o = session().start(Arrays.asList(sel("a.zip", "a.a", "1"), sel("b.zip", "b.b", "1"),
+                sel("c.zip", "c.c", "1")));
+        assertTrue(o.stopped);
+        assertEquals("USB drive not mounted", o.stopReason);
+        assertFalse(o.restoredDescriptor);
+        assertEquals(2, installCalls()); // c never ran
+        // the real stick still holds the unfinished queue and our descriptor
+        Queue onStick = session().loadUnfinished();
+        assertEquals(ItemState.DONE, onStick.items.get(0).state);
+        assertEquals(ItemState.INSTALLING, onStick.items.get(1).state);
+        assertEquals(ItemState.WAITING, onStick.items.get(2).state);
+        assertTrue(DescriptorSwap.hasOurs(stick));
+
+        stick.failWritesAfter(-1, "USB drive not mounted"); // plugged back in
+        QueueRunner.Outcome r = session().resume();
+        assertFalse(r.stopped);
+        assertTrue(r.queue.finished);
+        assertEquals(Messages.MSG_INTERRUPTED, r.queue.items.get(1).message);
+        assertEquals(ItemState.DONE, r.queue.items.get(2).state);
+        assertEquals(3, installCalls()); // b not retried
+        assertTrue(r.restoredDescriptor);
+        assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
     }
 
     @Test public void missingAtStartIsFailedItem() throws Exception {
@@ -106,7 +147,8 @@ public class QueueSessionTest {
         assertTrue(o.queue.finished);
         assertEquals(3, installCalls());
         assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
-        assertFalse(stick.exists("HKGPM/resume.sh"));
+        assertTrue(o.restoredDescriptor);
+        assertTrue(stick.exists("HKGPM/resume.sh"));
     }
 
     @Test public void resumeWithNothingReturnsNull() throws Exception {
@@ -132,7 +174,7 @@ public class QueueSessionTest {
                 sel("b.zip", "b.b", "1").withState(ItemState.INSTALLING, ""),
                 sel("c.zip", "c.c", "1")));
         stick.writeAtomic("HKGPM/queue.json", QueueCodec.encode(q));
-        session().discard();
+        assertTrue(session().discard()); // the original was put back
         Queue r = QueueCodec.decode(stick.read("HKGPM/queue.json"));
         assertTrue(r.finished);
         assertEquals(ItemState.DONE, r.items.get(0).state);
@@ -140,7 +182,7 @@ public class QueueSessionTest {
         assertEquals(Messages.MSG_DISCARDED, r.items.get(2).message);
         assertEquals(ItemState.FAILED, r.items.get(2).state);
         assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
-        assertFalse(stick.exists("HKGPM/resume.sh"));
+        assertTrue(stick.exists("HKGPM/resume.sh"));
     }
 
     @Test public void loadUnfinishedReturnsNullForFinishedQueue() throws Exception {
@@ -184,6 +226,13 @@ public class QueueSessionTest {
         stick.writeAtomic("HKGPM/queue.json", QueueCodec.encode(new Queue(true, Arrays.asList(sel("a.zip", "a.a", "1")))));
         assertNull(session().resume());
         assertEquals("[nemesis]\nid=stick\n", stick.text("NEMESIS.data"));
-        assertFalse(stick.exists("HKGPM/resume.sh"));
+        assertFalse(DescriptorSwap.hasOurs(stick));
+        assertNull(session().resume()); // nothing left to do
+    }
+
+    @Test public void resumeWithNoQueueButLeftoverDescriptorCleansUp() throws Exception {
+        DescriptorSwap.begin(stick, script); // no queue file at all
+        assertNull(session().resume());
+        assertFalse(stick.exists("NEMESIS.data"));
     }
 }

@@ -1,8 +1,10 @@
 package hkgpackagemanager.app;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
@@ -10,11 +12,13 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import hkgpackagemanager.core.DescriptorSwap;
 import hkgpackagemanager.core.Queue;
 import hkgpackagemanager.core.QueueCodec;
 import hkgpackagemanager.core.QueueItem;
 import hkgpackagemanager.core.QueueSession;
 import hkgpackagemanager.core.ScreenText;
+import java.util.List;
 
 /** The four tabs, and the start-up decision: progress, an unfinished install, or the USB drive. */
 public class MainActivity extends Activity {
@@ -35,9 +39,16 @@ public class MainActivity extends Activity {
     private FrameLayout frame;
     private int current = -1;
     private NemesisCli cli;
+    /** The open resume or unreadable-list prompt, if any; a run or a new routing makes it stale. */
+    private AlertDialog prompt;
 
     private final BroadcastReceiver changed = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            if (QueueService.isRunning() && prompt != null) {
+                dismissPrompt(); // e.g. resume.sh started the queue while the insert prompt was up
+                show(TAB_PROGRESS);
+                return;
+            }
             if (current >= 0 && (current == TAB_PROGRESS || !QueueService.isRunning())) screens[current].refresh();
         }
     };
@@ -61,19 +72,56 @@ public class MainActivity extends Activity {
         page.addView(frame, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(page);
-        route(getIntent());
+        refreshSettingsCache();
+        // a recreated activity (state != null) or one reopened from Recents must not auto-resume again
+        route(getIntent(), state == null && !fromHistory(getIntent()));
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        route(intent);
+        route(intent, !fromHistory(intent));
+    }
+
+    private static boolean fromHistory(Intent in) {
+        return (in.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+    }
+
+    /** A NEMESIS update wipes filesDir (uninstall without -k): rebuild the button receiver's settings cache. */
+    private void refreshSettingsCache() {
+        final StateStore store = new StateStore(this, cli);
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    store.load();
+                } catch (RuntimeException e) {
+                    AppLog.get(MainActivity.this).log("cannot refresh settings: " + e);
+                }
+            }
+        }, "hkgpm-settings").start();
     }
 
     @Override protected void onResume() {
         super.onResume();
         registerReceiver(changed, new IntentFilter(QueueService.ACTION_CHANGED));
+        if (QueueService.isRunning() && prompt != null) {
+            dismissPrompt();
+            show(TAB_PROGRESS);
+            return;
+        }
         if (current >= 0) screens[current].refresh(); // something may have changed while we were away
+    }
+
+    @Override protected void onDestroy() {
+        dismissPrompt();
+        super.onDestroy();
+    }
+
+    private void dismissPrompt() {
+        if (prompt != null) {
+            Ui.dismiss(prompt);
+            prompt = null;
+        }
     }
 
     @Override protected void onPause() {
@@ -100,12 +148,16 @@ public class MainActivity extends Activity {
         String root;
         Queue queue;      // readable unfinished queue
         String unreadable; // or the reason it cannot be read
+        boolean leftover; // no unfinished queue, but some stick still has our resume descriptor
     }
 
-    private void route(Intent in) {
+    /** {@code allowResume}: honour EXTRA_RESUME (not on recreation or a Recents launch). */
+    private void route(Intent in, boolean allowResume) {
+        dismissPrompt(); // a newer entry point (resume.sh, a run finishing) replaces an open prompt
         String root = in.getStringExtra(EXTRA_ROOT);
         if (!Sticks.isStickRoot(root)) root = null; // we are exported; only trust known mount points
-        final boolean resume = in.getBooleanExtra(EXTRA_RESUME, false);
+        final boolean resume = allowResume && in.getBooleanExtra(EXTRA_RESUME, false);
+        in.removeExtra(EXTRA_RESUME); // used once
         boolean progress = in.getBooleanExtra(EXTRA_PROGRESS, false);
         if (QueueService.isRunning() || progress) {
             show(TAB_PROGRESS);
@@ -114,7 +166,8 @@ public class MainActivity extends Activity {
         final String first = root;
         Ui.background(this, new Ui.Work<Found>() {
             public Found run() {
-                for (String r : ScreenText.preferredFirst(Sticks.mounted(), first)) {
+                List<String> mounted = Sticks.mounted();
+                for (String r : ScreenText.preferredFirst(mounted, first)) {
                     StickFs fs = new StickFs(MainActivity.this, r, cli);
                     QueueSession s = new QueueSession(fs, r, cli, fs, new byte[0], null);
                     Found f = new Found();
@@ -123,17 +176,27 @@ public class MainActivity extends Activity {
                         f.queue = s.loadUnfinished();
                         if (f.queue != null) return f;
                     } catch (QueueCodec.Unreadable e) {
-                        f.unreadable = String.valueOf(e.getMessage());
+                        f.unreadable = e.getMessage() != null ? e.getMessage() : e.toString();
                         return f;
                     }
                 }
-                return new Found();
+                Found none = new Found();
+                if (resume) {
+                    // resume.sh ran but nothing is unfinished: tidy a leftover descriptor (Ruling R11)
+                    for (String r : mounted) {
+                        if (DescriptorSwap.hasOurs(new StickFs(MainActivity.this, r, cli))) none.leftover = true;
+                    }
+                }
+                return none;
             }
         }, new Ui.Done<Found>() {
             public void done(Found f) {
                 if (QueueService.isRunning()) show(TAB_PROGRESS);
-                else if (f == null || f.root == null) show(TAB_DRIVE);
-                else if (f.unreadable != null) askUnreadable(f);
+                else if (f == null || f.root == null) {
+                    // no root: the service sweeps every mounted stick (one request; it ignores a second while busy)
+                    if (f != null && f.leftover) startQueue(QueueService.ACTION_RESUME, null);
+                    show(TAB_DRIVE);
+                } else if (f.unreadable != null) askUnreadable(f);
                 else if (resume) {
                     startQueue(QueueService.ACTION_RESUME, f.root);
                     show(TAB_PROGRESS);
@@ -143,22 +206,24 @@ public class MainActivity extends Activity {
     }
 
     private void askUnreadable(final Found f) {
-        Ui.confirm(this, null, "Couldn't read the install list on " + f.root + ": " + f.unreadable,
+        dismissPrompt();
+        prompt = track(Ui.confirm(this, null, "Couldn't read the install list on " + f.root + ": " + f.unreadable,
                 "Discard", new Runnable() {
                     public void run() { discard(f.root); }
                 }, "Keep", new Runnable() {
                     public void run() { show(TAB_DRIVE); }
                 }, new Runnable() {
                     public void run() { show(TAB_DRIVE); }
-                });
+                }));
     }
 
     private void askResume(final Found f) {
+        dismissPrompt();
         StringBuilder sb = new StringBuilder(ScreenText.RESUME_PROMPT).append("\n");
         for (QueueItem i : f.queue.items) {
             sb.append("\n").append(ScreenText.itemLine(i, i.id));
         }
-        Ui.confirm(this, null, sb.toString(), "Continue", new Runnable() {
+        prompt = track(Ui.confirm(this, null, sb.toString(), "Continue", new Runnable() {
             public void run() {
                 startQueue(QueueService.ACTION_RESUME, f.root);
                 show(TAB_PROGRESS);
@@ -167,10 +232,25 @@ public class MainActivity extends Activity {
             public void run() { discard(f.root); }
         }, new Runnable() {
             public void run() { show(TAB_DRIVE); } // Back or an outside tap keeps the list
+        }));
+    }
+
+    /** Forgets the prompt once it closes, however it closes. */
+    private AlertDialog track(final AlertDialog d) {
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            public void onDismiss(DialogInterface di) {
+                if (prompt == d) prompt = null;
+            }
         });
+        return d;
     }
 
     private void discard(String root) {
+        if (QueueService.isRunning()) { // the service would ignore it; say so instead of pretending
+            Ui.info(this, null, ScreenText.RUNNING_INFO);
+            show(TAB_PROGRESS);
+            return;
+        }
         startQueue(QueueService.ACTION_DISCARD, root);
         show(TAB_DRIVE);
     }

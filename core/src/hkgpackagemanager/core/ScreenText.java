@@ -10,6 +10,13 @@ public final class ScreenText {
     public static final String RESUME_PROMPT = "Unfinished install found: continue?";
     public static final String RESTART_LINE = "Restart the head unit to finish.";
     public static final String CONFLICT_LINE = "NEMESIS Manager may also open on this button.";
+    /** After a run that put the stick's own NEMESIS.data back (Ruling R20): NEMESIS's handler acts on it at once. */
+    public static final String RESTORED_NOTE = "NEMESIS may now ask about the drive's own NEMESIS.data. "
+            + "Answer as you would when inserting the drive.";
+    /** Added to the single Install/Update confirmation when the package is this manager. */
+    public static final String SELF_UPDATE_WARNING = "The manager will close while it updates; open it again afterwards.";
+    /** Discard asked for while the service runs a queue. */
+    public static final String RUNNING_INFO = "An install is running.";
 
     private ScreenText() {}
 
@@ -21,10 +28,26 @@ public final class ScreenText {
             case UPDATE: {
                 InstalledPackage p = installed.get(zip.meta.id);
                 String have = p == null || p.version == null || p.version.length() == 0 ? "unknown" : p.version.trim();
-                return "Update (installed " + have + ", drive " + zip.meta.version.trim() + ")";
+                String drive = zip.meta.version.trim().length() == 0 ? "unknown" : zip.meta.version.trim();
+                return "Update (installed " + have + ", drive " + drive + ")";
             }
             default: return zip.problem;
         }
+    }
+
+    /**
+     * The note at the top of the Progress screen: the handler note while a queue runs, the
+     * restored-descriptor note after a run that put the drive's own NEMESIS.data back, else none.
+     */
+    public static String descriptorNote(boolean running, boolean restoredDescriptor) {
+        if (running) return HANDLER_NOTE;
+        return restoredDescriptor ? RESTORED_NOTE : null;
+    }
+
+    /** `Update Name 1.2?` for one zip, with the self-update warning when the package is this manager. */
+    public static String singleConfirm(String action, PackageMeta meta) {
+        String q = action + " " + meta.name + (meta.version.length() == 0 ? "" : " " + meta.version) + "?";
+        return QueueOrder.SELF_ID.equals(meta.id) ? q + "\n\n" + SELF_UPDATE_WARNING : q;
     }
 
     /** The button label for a row: Update for UPDATE, Install otherwise. */
