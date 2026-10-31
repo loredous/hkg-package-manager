@@ -26,6 +26,7 @@ CHUNK = 65536
 MAX_INDEX = 2 * 1024 * 1024
 MAX_SMALL = 16 * 1024
 RESERVED = ("index.json", "index.json.sig", "key.pem")
+SEG_RE = re.compile(r"^[A-Za-z0-9._ -]+$")
 
 
 class Fail(Exception):
@@ -169,14 +170,13 @@ def local_path_for(entry_id, zip_loc):
     """Relative path under the catalog folder, or None if the location is invalid."""
     if is_url(zip_loc):
         return "remote/%s.zip" % entry_id
-    if (not zip_loc or zip_loc.startswith("/") or "\\" in zip_loc
-            or zip_loc.startswith("remote/") or "://" in zip_loc):
+    if not zip_loc or zip_loc.startswith("/"):
         return None
     low = zip_loc.lower()  # sticks are FAT/exFAT: names compare case-insensitively
-    if low in RESERVED or low.endswith(".part"):
+    if low.startswith("remote/") or low in RESERVED or low.endswith(".part"):
         return None
     for seg in zip_loc.split("/"):
-        if seg in ("", ".", ".."):
+        if seg in ("", ".", "..") or SEG_RE.fullmatch(seg) is None:
             return None
     return zip_loc
 
@@ -188,6 +188,8 @@ def write_atomic(path, data):
     part = path + ".part"
     with open(part, "wb") as f:
         f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(part, path)
 
 
@@ -236,6 +238,16 @@ def file_ok(path, size, sha):
         return False
 
 
+def inside(target_abs, dest):
+    """Backstop: refuse any path that resolves outside the catalog folder."""
+    try:
+        ok = os.path.commonpath([target_abs, os.path.abspath(dest)]) == target_abs
+    except ValueError:
+        ok = False
+    if not ok:
+        raise Fail("refusing to touch a path outside the catalog folder: %s" % dest)
+
+
 def _rm(path):
     try:
         os.remove(path)
@@ -258,6 +270,8 @@ def download(loc, dest, size, sha, entry_id):
                         break
                     h.update(chunk)
                     out.write(chunk)
+                out.flush()
+                os.fsync(out.fileno())
         finally:
             src.close()
         if total != size or h.hexdigest() != sha:
@@ -306,11 +320,13 @@ def mirror(src, stick, only, fp_arg):
     except Exception as e:
         raise Fail("can't read the catalog: %s" % e)
     try:
-        index = json.loads(index_raw.decode("utf-8"))
+        index = json.loads(index_raw.decode("utf-8-sig"))
         if not isinstance(index, dict):
             raise ValueError("not an object")
+    except RecursionError:
+        raise Fail("index.json is not valid JSON")
     except ValueError as e:
-        raise Fail("index.json isn't valid JSON: %s" % e)
+        raise Fail("index.json is not valid JSON: %s" % e)
     try:
         spki_rsa(pem_to_der(key_pem))
         key_fp = fingerprint(key_pem)
@@ -333,6 +349,8 @@ def mirror(src, stick, only, fp_arg):
     fmt = index.get("format")
     if isinstance(fmt, bool) or not isinstance(fmt, int):
         raise Fail("index has no integer format")
+    if fmt < 1:
+        raise Fail("index format must be 1 or higher")
     if fmt > FORMAT:
         raise Fail("catalog format %d is newer than this tool understands" % fmt)
     if not valid_id(cat_id):
@@ -350,10 +368,12 @@ def mirror(src, stick, only, fp_arg):
         store_trusted(key_fp, name)
 
     target = os.path.join(stick, "HKGPM", "catalogs", cat_id)
+    target_abs = os.path.abspath(target)
     fetched = kept = removed = 0
     keep = set(CATALOG_FILES)
     for pid, local, zloc, size, sha in wanted:
         dest = os.path.join(target, *local.split("/"))
+        inside(target_abs, dest)
         keep.add(local)
         if file_ok(dest, size, sha):
             kept += 1
@@ -372,6 +392,7 @@ def mirror(src, stick, only, fp_arg):
             p = os.path.join(d, n)
             rel = os.path.relpath(p, target).replace(os.sep, "/")
             if rel not in keep:
+                inside(target_abs, p)
                 _rm(p)
                 removed += 1
                 print("removed  %s" % rel)

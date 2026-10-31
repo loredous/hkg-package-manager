@@ -1,4 +1,6 @@
+import contextlib
 import filecmp
+import io
 import json
 import os
 import subprocess
@@ -74,7 +76,7 @@ class MakeCatalogTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "test-catalogs")
-            os.makedirs(out)
+            self.assertEqual(0, make_catalog.main(["make_catalog.py", "car", out]))
             with open(os.path.join(out, "stale"), "w") as f:
                 f.write("x")
             self.assertEqual(0, make_catalog.main(["make_catalog.py", "car", out]))
@@ -103,6 +105,27 @@ class MakeCatalogTest(unittest.TestCase):
                 changed = f.read()
             with open(os.path.join(trusted, "index.json"), "rb") as f:
                 self.assertEqual(len(f.read()), len(changed))
+
+    def test_car_refuses_a_folder_that_is_not_its_own_output(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            self._refuses()
+
+    def _refuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            keep = os.path.join(tmp, "precious.txt")
+            with open(keep, "w") as f:
+                f.write("x")
+            self.assertEqual(2, make_catalog.main(["make_catalog.py", "car", tmp]))
+            self.assertTrue(os.path.exists(keep))
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                self.assertEqual(2, make_catalog.main(["make_catalog.py", "car", "."]))
+            finally:
+                os.chdir(cwd)
+            self.assertTrue(os.path.exists(keep))
+        for bad in (os.sep, os.path.expanduser("~"), REPO):
+            self.assertEqual(2, make_catalog.main(["make_catalog.py", "car", bad]))
 
 
 if __name__ == "__main__":

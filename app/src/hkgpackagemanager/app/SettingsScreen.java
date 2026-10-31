@@ -205,7 +205,10 @@ final class SettingsScreen implements Ui.Screen {
                 Ui.background(act, new Ui.Work<TrustedKeys>() {
                     public TrustedKeys run() { return store.removeKey(fp); }
                 }, new Ui.Done<TrustedKeys>() {
-                    public void done(TrustedKeys k) { applyKeys(k); }
+                    public void done(TrustedKeys k) {
+                        if (k == null) keysResult.setText(ScreenText.KEYS_NOT_SAVED);
+                        else applyKeys(k);
+                    }
                 });
             }
         }, "Cancel", null);
@@ -298,8 +301,12 @@ final class SettingsScreen implements Ui.Screen {
                             public TrustedKeys run() { return store.addKey(f.fingerprint, f.fileName); }
                         }, new Ui.Done<TrustedKeys>() {
                             public void done(TrustedKeys k) {
+                                if (k == null) {
+                                    keysResult.setText(ScreenText.KEYS_NOT_SAVED);
+                                    return;
+                                }
                                 applyKeys(k);
-                                askNext(scan, index + 1, k == null ? added : added + 1);
+                                askNext(scan, index + 1, added + 1);
                             }
                         });
                     }

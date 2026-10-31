@@ -208,7 +208,9 @@ public class CatalogIndexTest {
 
     @Test public void zipLocationThatEscapesIsInvalid() throws Exception {
         String[] bad = {"../x.zip", "/system/x.zip", "a/../../x.zip", "a\\\\b.zip", "", "a//b.zip",
-            "remote/x.zip", "ftp://h/x.zip", "./x.zip", "a/./x.zip", "a/"};
+            "remote/x.zip", "ftp://h/x.zip", "./x.zip", "a/./x.zip", "a/",
+            "C:x.zip", "a:b.zip", "a/b\\u0001.zip", "a/b\\u0000.zip", "Remote/x.zip", "REMOTE/x.zip",
+            "KEY.PEM", "Index.Json", "index.json.SIG", "zips/a.ZIP.PART", "a.part", "zips/a&b.zip"};
         for (String z : bad) {
             String j = entry("a.b", "").replace("\"zips/a.b.zip\"", "\"" + z + "\"");
             assertEquals(z, "unsupported zip location", problemOfOnly(j));

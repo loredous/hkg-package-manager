@@ -152,6 +152,30 @@ def _flip(path, marker):
         f.write(bytes(data))
 
 
+def car_out_problem(out_dir):
+    """Why out_dir can't be emptied and rebuilt, or None. Only a folder this tool built before qualifies."""
+    path = os.path.realpath(out_dir)
+    repo = os.path.dirname(os.path.dirname(HERE))
+    protected = [os.path.realpath(os.sep), os.path.realpath(os.path.expanduser("~")),
+                 os.path.realpath(repo)]
+    if any(path == x or path in _parents(x) for x in protected):
+        return "refusing to use %s: it holds the repo, the home folder or the root" % out_dir
+    if os.path.exists(path) and (not os.path.isdir(path) or (
+            os.listdir(path) and not os.path.isdir(os.path.join(path, "trusted")))):
+        return "refusing to empty %s: it isn't empty and has no trusted/ folder from an earlier run" % out_dir
+    return None
+
+
+def _parents(path):
+    out = []
+    while True:
+        up = os.path.dirname(path)
+        if up == path:
+            return out
+        out.append(up)
+        path = up
+
+
 def build_car(out_dir):
     """Write the stick-ready scenario trees under out_dir (emptied first)."""
     shutil.rmtree(out_dir, ignore_errors=True)
@@ -188,6 +212,10 @@ def main(argv):
         print(build_sample(argv[2]))
         return 0
     if len(argv) == 3 and argv[1] == "car":
+        problem = car_out_problem(argv[2])
+        if problem:
+            sys.stderr.write(problem + "\n")
+            return 2
         build_car(argv[2])
         return 0
     sys.stderr.write("usage: make_catalog.py sample <stick-root> | car <out-dir>\n")

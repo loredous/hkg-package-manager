@@ -57,10 +57,24 @@ A field of a known name with the wrong type makes that package entry invalid.
 A package id may appear once in a catalog. A later entry with an id already used earlier in
 the same catalog is invalid (shown, not installable).
 
-A relative `zip` uses `/` separators, does not start with `/` or `remote/`, contains no `\`,
-and has no empty, `.` or `..` segment. Any other URL scheme makes the entry invalid.
+A relative `zip` uses `/` separators and does not start with `/`. Each segment may contain
+only `A-Z a-z 0-9 . _ -` and space: no `:` (so no Windows drive letters), no `\`, no
+control characters or NUL, no other punctuation, and no empty, `.` or `..` segment. Sticks
+are FAT/exFAT, so names compare case-insensitively: a location starting with `remote/` in
+any case is invalid, and so are `index.json`, `index.json.sig` and `key.pem` (any case) and
+anything ending in `.part` (any case). Any other URL scheme makes the entry invalid.
 Readers check the size and hash of a zip when listing and again just before installing; a
 mismatch refuses the zip.
+
+The zip's own `NEMESIS.data` `[nemesis]` section must have an `id` and a `version` equal to
+the entry's `id` and `version`. Otherwise the manager shows "zip doesn't match its catalog
+entry (id or version)" and won't install it.
+
+## Size limits and encoding
+
+Readers refuse `index.json` over 2 MiB (2097152 bytes), and `key.pem` or `index.json.sig`
+over 16 KiB (16384 bytes) each. `index.json` is UTF-8. A leading UTF-8 byte order mark is
+tolerated (the signature still covers the exact bytes, mark included) but not recommended.
 
 ### Compatibility
 

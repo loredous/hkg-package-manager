@@ -56,27 +56,50 @@ public final class StateStore {
         return text == null ? TrustedKeys.NONE : TrustedKeys.decode(text);
     }
 
-    /** Reads the keys fresh, adds one and saves, all under one lock; returns the new set. */
+    /** Reads the keys fresh, adds one and saves, all under one lock; returns the new set, or null if it couldn't be saved. */
     public TrustedKeys addKey(String fp, String label) {
         synchronized (KEYS_LOCK) {
-            TrustedKeys k = loadKeys().with(fp, label);
-            saveKeys(k);
-            return k;
+            String text = keysTextForChange();
+            if (text == null) return null;
+            TrustedKeys k = TrustedKeys.decode(text).with(fp, label);
+            return saveKeys(k) ? k : null;
         }
     }
 
-    /** Reads the keys fresh, removes one and saves, all under one lock; returns the new set. */
+    /** Reads the keys fresh, removes one and saves, all under one lock; returns the new set, or null if it couldn't be saved. */
     public TrustedKeys removeKey(String fp) {
         synchronized (KEYS_LOCK) {
-            TrustedKeys k = loadKeys().without(fp);
-            saveKeys(k);
-            return k;
+            String text = keysTextForChange();
+            if (text == null) return null;
+            TrustedKeys k = TrustedKeys.decode(text).without(fp);
+            return saveKeys(k) ? k : null;
         }
     }
 
-    /** Writes the cache, then root-copies it into the state folder. */
-    public void saveKeys(TrustedKeys k) {
-        saveText(k.encode(), KEYS_PATH, keysCache, keysStage, "keys");
+    /**
+     * The keys text to build a change on: the root copy, or the cache (or nothing) when the file is
+     * missing or empty. Null when the root read failed for another reason and there is no cache, so
+     * a transient failure can't wipe the trusted keys.
+     */
+    private String keysTextForChange() {
+        CliResult r = nemesis.root(NemesisCalls.catCommand(KEYS_PATH));
+        if (r.exit == 0 && r.output.trim().length() > 0) {
+            try {
+                writeFile(keysCache, r.output.getBytes("UTF-8"));
+            } catch (IOException e) {
+                log.log("cannot refresh keys cache: " + e.getMessage());
+            }
+            return r.output;
+        }
+        String cached = readCache(keysCache);
+        boolean missing = r.exit == 0 || r.output.toLowerCase(java.util.Locale.US).contains("no such file");
+        if (cached != null) return cached;
+        return missing ? "" : null;
+    }
+
+    /** Writes the cache, then root-copies it into the state folder; false if either step failed. */
+    public boolean saveKeys(TrustedKeys k) {
+        return saveText(k.encode(), KEYS_PATH, keysCache, keysStage, "keys");
     }
 
     /** The root file's text (refreshing the cache), or null if it is missing or empty. */
@@ -93,21 +116,23 @@ public final class StateStore {
         return null;
     }
 
-    private void saveText(String text, String rootPath, File cacheFile, File stageFile, String what) {
+    private boolean saveText(String text, String rootPath, File cacheFile, File stageFile, String what) {
         byte[] data;
         try {
             data = text.getBytes("UTF-8");
             writeFile(cacheFile, data);
         } catch (IOException e) {
             log.log("cannot write " + what + " cache: " + e.getMessage());
-            return;
+            return false;
         }
         try {
             writeFile(stageFile, data);
             CliResult r = nemesis.root(NemesisCalls.copyIntoCommand(stageFile.getAbsolutePath(), rootPath));
             if (r.exit != 0) log.log(what + " root copy failed: " + r.lastLine());
+            return r.exit == 0;
         } catch (IOException e) {
             log.log("cannot stage " + what + ": " + e.getMessage());
+            return false;
         } finally {
             stageFile.delete();
         }

@@ -154,7 +154,17 @@ public final class CatalogIndex {
 
     private static boolean goodZip(String z) {
         if (CatalogEntry.isUrl(z)) return true;
-        if (z.length() == 0 || z.startsWith("/") || z.startsWith("remote/") || z.indexOf('\\') >= 0) return false;
+        if (z.length() == 0 || z.startsWith("/")) return false;
+        // sticks are FAT/exFAT: names compare case-insensitively
+        String low = z.toLowerCase(java.util.Locale.US);
+        if (low.startsWith("remote/") || low.equals("index.json") || low.equals("index.json.sig")
+                || low.equals("key.pem") || low.endsWith(".part")) return false;
+        for (int i = 0; i < z.length(); i++) {
+            char c = z.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '_' || c == '-' || c == ' ' || c == '/';
+            if (!ok) return false;
+        }
         int from = 0;
         while (true) {
             int slash = z.indexOf('/', from);

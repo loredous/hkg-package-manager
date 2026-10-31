@@ -240,7 +240,7 @@ final class DriveScreen implements Ui.Screen {
     private void selectAll() {
         for (StickZip z : zips) if (z.meta != null) checked.add(z.relPath);
         for (CatalogView v : views) {
-            if (v.trust != CatalogView.Trust.TRUSTED) continue;
+            if (v.trust != CatalogView.Trust.TRUSTED || error != null) continue;
             for (CatalogZip z : v.zips) {
                 if (z.installable() && verdictOf(z).colour != Colour.RED) checked.add(z.relPath);
             }
@@ -273,7 +273,7 @@ final class DriveScreen implements Ui.Screen {
         if (v.trust == CatalogView.Trust.TRUSTED) {
             content.addView(Ui.bold(act, v.index.name));
             content.addView(grey(v.index.publisher));
-            for (CatalogZip z : v.zips) content.addView(catalogRow(z));
+            for (CatalogZip z : v.zips) content.addView(catalogRow(z, v.index.name));
         } else if (v.trust == CatalogView.Trust.UNTRUSTED) {
             content.addView(Ui.text(act, ScreenText.untrustedLine(v.index.name, v.fingerprint)));
             content.addView(Ui.button(act, ScreenText.TRUST_BUTTON, new View.OnClickListener() {
@@ -291,11 +291,13 @@ final class DriveScreen implements Ui.Screen {
                     public void run() {
                         Ui.background(act, new Ui.Work<Boolean>() {
                             public Boolean run() {
-                                new StateStore(act, cli).addKey(v.fingerprint, v.index.name);
-                                return Boolean.TRUE;
+                                return new StateStore(act, cli).addKey(v.fingerprint, v.index.name) != null;
                             }
                         }, new Ui.Done<Boolean>() {
-                            public void done(Boolean ok) { refresh(); }
+                            public void done(Boolean ok) {
+                                if (ok == null || !ok) Ui.info(act, null, ScreenText.KEYS_NOT_SAVED);
+                                refresh();
+                            }
                         });
                     }
                 }, "Cancel", null);
@@ -325,21 +327,22 @@ final class DriveScreen implements Ui.Screen {
         return z.entry.id != null ? z.entry.id : "(invalid entry)";
     }
 
-    private View catalogRow(final CatalogZip z) {
+    private View catalogRow(final CatalogZip z, String catalogName) {
         LinearLayout row = Ui.row(act);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         LinearLayout info = Ui.column(act);
         final Verdict verdict = verdictOf(z);
         info.addView(Ui.bold(act, displayName(z)));
         if (verdict != null) {
-            info.addView(Ui.text(act, z.entry.id + "   " + z.entry.version));
+            info.addView(Ui.text(act, z.entry.id + "   " + z.entry.version + "   \u00b7 " + catalogName));
             if (z.entry.description != null && z.entry.description.length() > 0) {
                 info.addView(Ui.text(act, z.entry.description));
             }
-            info.addView(verdictText(verdict));
+            // without the package list the conflicts are unknown, so no colour is shown
+            if (error == null) info.addView(verdictText(verdict));
         }
-        if (!z.installable()) {
-            info.addView(grey(z.problem));
+        if (!z.installable() || error != null) {
+            if (z.problem != null) info.addView(grey(z.problem));
             row.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
             return row;
         }
@@ -436,10 +439,10 @@ final class DriveScreen implements Ui.Screen {
                     StatusLabeler.label(z, installed) != ZipStatus.NEW, CompatCheck.LOOSE.colour));
         }
         for (CatalogView v : views) {
-            if (v.trust != CatalogView.Trust.TRUSTED) continue;
+            if (v.trust != CatalogView.Trust.TRUSTED || error != null) continue;
             for (CatalogZip z : v.zips) {
                 if (!z.installable() || !checked.contains(z.relPath)) continue;
-                out.add(new Pick(z.relPath, z.entry.name, z.entry.version,
+                out.add(new Pick(z.relPath, z.entry.name + " (" + v.index.name + ")", z.entry.version,
                         StatusLabeler.label(z.zip, installed) != ZipStatus.NEW, verdictOf(z).colour));
             }
         }

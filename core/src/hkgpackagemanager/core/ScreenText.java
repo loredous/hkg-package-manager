@@ -28,6 +28,7 @@ public final class ScreenText {
     public static final String LOOSE_HEADER = "Not from a catalog";
     /** Button on an untrusted catalog's row. */
     public static final String TRUST_BUTTON = "Trust this key";
+    public static final String KEYS_NOT_SAVED = "Couldn't save the trusted keys.";
 
     private ScreenText() {}
 

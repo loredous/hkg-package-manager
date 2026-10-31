@@ -221,7 +221,9 @@ class HostileTest(Base):
         bad += [{"zip": z} for z in ["../x.zip", "/x.zip", "a\\b.zip", "a//b.zip", "a/./b.zip",
                                      "remote/x.zip", "ftp://h/x.zip", "", "a/",
                                      "index.json", "KEY.PEM", "Index.Json.Sig", "zips/a.zip.part",
-                                     "A.PART", 7]]
+                                     "A.PART", "C:x.zip", "a:b.zip", "a/b\x01.zip", "a\x00b.zip",
+                                     "Remote/x.zip", "REMOTE/x.zip", "zips/a.ZIP.PART",
+                                     "zips/a&b.zip", 7]]
         bad += [{"size": v} for v in ["12", -1, 1.5, True, None]]
         bad += [{"sha256": v} for v in ["a" * 63, "a" * 64 + "\n", "g" * 64, "a" * 65, 5]]
         for patch in bad:
@@ -253,6 +255,35 @@ class HostileTest(Base):
         self.assertIn("newer", err)
         self.assertEqual(os.listdir(self.stick), [])
         self.assertFalse(os.path.exists(self.trusted_file()))
+
+    def test_format_0_and_negative_exit_1_and_write_nothing(self):
+        for f in (0, -1):
+            src = self.build("src%d" % (f + 1))
+            self.resign(src, format=f)
+            code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+            self.assertEqual(code, 1, f)
+            self.assertIn("format", err)
+            self.assertEqual(os.listdir(self.stick), [])
+
+    def test_deeply_nested_index_exits_1_without_traceback(self):
+        src = self.build()
+        with open(os.path.join(src, "index.json"), "wb") as f:
+            f.write(b"[" * 200000)
+        code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+        self.assertEqual(code, 1)
+        self.assertIn("index.json is not valid JSON", err)
+        self.assertEqual(os.listdir(self.stick), [])
+
+    def test_bom_prefixed_signed_index_mirrors(self):
+        src = self.build()
+        p = os.path.join(src, "index.json")
+        with open(p, "wb") as f:
+            f.write(b"\xef\xbb\xbf" + read(os.path.join(SAMPLE, "index.json")))
+        make_catalog._openssl("dgst", "-sha256", "-sign", KEY,
+                              "-out", os.path.join(src, "index.json.sig"), p)
+        code, _, err = self.run_cli(src, self.stick, "--fingerprint", self.fp)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(read(os.path.join(self.target, "index.json"))[:3], b"\xef\xbb\xbf")
 
     def test_key_mismatch_exits_1_and_writes_nothing(self):
         src = self.build()
