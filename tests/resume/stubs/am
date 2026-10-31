@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "am $*" >> "${RESUME_AM_LOG:-/dev/null}"
